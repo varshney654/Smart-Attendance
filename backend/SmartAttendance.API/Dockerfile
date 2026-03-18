@@ -1,9 +1,10 @@
 # Smart Attendance System - Dockerfile
 # This Dockerfile is optimized for production deployment on Render
+# Using .NET 8 (LTS stable version)
 
 # Stage 1: Build
-# Use .NET 10 SDK for building the application
-FROM mcr.microsoft.com/dotnet/sdk:10.0 AS build
+# Use .NET 8 SDK for building the application
+FROM mcr.microsoft.com/dotnet/sdk:8.0 AS build
 
 WORKDIR /src
 
@@ -19,7 +20,7 @@ RUN dotnet publish SmartAttendance.API.csproj -c Release -o /app/publish
 
 # Stage 2: Runtime
 # Use ASP.NET Core runtime for running the application
-FROM mcr.microsoft.com/dotnet/aspnet:10.0 AS final
+FROM mcr.microsoft.com/dotnet/aspnet:8.0 AS final
 
 WORKDIR /app
 
