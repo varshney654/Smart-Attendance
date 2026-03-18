@@ -1,0 +1,58 @@
+# .dockerignore for Smart Attendance API
+# This file prevents unnecessary files from being copied into the Docker image
+
+# Git
+.git
+.gitignore
+
+# IDE and editor files
+.vs
+.vscode
+.idea
+*.user
+*.suo
+*.userosscache
+*.sln.docstates
+
+# Build outputs
+bin/
+obj/
+out/
+build_output*.txt
+
+# Test files
+*.test.csproj
+*.Tests.csproj
+TestResults/
+coverage/
+
+# Documentation
+*.md
+docs/
+LICENSE
+README*
+
+# Environment files (we'll use Docker environment variables instead)
+.env
+.env.*
+!.env.example
+
+# Docker files (not needed inside the image)
+Dockerfile*
+docker-compose*
+.dockerignore
+
+# CI/CD
+.github/
+.gitlab-ci.yml
+.travis.yml
+Jenkinsfile
+azure-pipelines.yml
+
+# Misc
+*.log
+*.tmp
+*.temp
+*.cache
+Thumbs.db
+Desktop.ini

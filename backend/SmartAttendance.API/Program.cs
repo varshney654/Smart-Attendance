@@ -9,8 +9,11 @@ using System.Text;
 
 var builder = WebApplication.CreateBuilder(args);
 
-// Load .env variables
-DotNetEnv.Env.Load("../../.env");
+// Only load .env file in development (not in Docker/Render)
+if (builder.Environment.IsDevelopment())
+{
+    DotNetEnv.Env.Load("../../.env");
+}
 
 // Fix TLS issue on Windows
 ServicePointManager.SecurityProtocol = SecurityProtocolType.Tls12 | SecurityProtocolType.Tls11 | SecurityProtocolType.Tls;
@@ -76,18 +79,24 @@ if (app.Environment.IsDevelopment())
 }
 
 app.UseCors("AllowAll");
-app.UseHttpsRedirection();
+
+// Disable HTTPS redirection in production (Render handles SSL termination)
+if (!builder.Environment.IsProduction())
+{
+    app.UseHttpsRedirection();
+}
 
 app.UseAuthentication();
 app.UseAuthorization();
 
 app.MapControllers();
 
-// Configure port from env
-var portStr = Environment.GetEnvironmentVariable("PORT");
-if (int.TryParse(portStr, out int port))
-{
-    app.Urls.Add($"http://*:{port}");
-}
+// Configure port from environment variable (required for Render)
+// Render sets the PORT environment variable, so we must listen on that port
+var port = Environment.GetEnvironmentVariable("PORT") ?? "5000";
+app.Urls.Add($"http://0.0.0.0:{port}");
+
+// Add a simple health check endpoint for Render
+app.MapGet("/health", () => Results.Ok(new { status = "healthy", timestamp = DateTime.UtcNow }));
 
 app.Run();
