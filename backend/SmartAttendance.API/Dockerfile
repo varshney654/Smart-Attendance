@@ -4,18 +4,20 @@
 # Stage 1: Build
 FROM mcr.microsoft.com/dotnet/sdk:8.0 AS build
 
-WORKDIR /src
+WORKDIR /app
 
-# Copy project file and restore dependencies
-COPY SmartAttendance.API.csproj ./
+# Copy project file first for better caching
+COPY *.csproj ./
 RUN dotnet restore
 
 # Copy all source files
 COPY . .
 
-# Build and publish
-WORKDIR /src
-RUN dotnet publish SmartAttendance.API.csproj -c Release -o /app/publish
+# Build the application
+RUN dotnet build -c Release
+
+# Publish the application
+RUN dotnet publish -c Release -o /app/publish
 
 # Stage 2: Runtime
 FROM mcr.microsoft.com/dotnet/aspnet:8.0 AS final
