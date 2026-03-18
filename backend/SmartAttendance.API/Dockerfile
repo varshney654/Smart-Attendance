@@ -1,30 +1,28 @@
 # Smart Attendance System - Dockerfile
-# This Dockerfile is optimized for production deployment on Render
-# Using .NET 8 (LTS stable version)
+# Optimized for production deployment on Render with .NET 8
 
 # Stage 1: Build
-# Use .NET 8 SDK for building the application
 FROM mcr.microsoft.com/dotnet/sdk:8.0 AS build
 
 WORKDIR /src
 
 # Copy project file and restore dependencies
-COPY SmartAttendance.API.csproj ./SmartAttendance.API/
-RUN dotnet restore SmartAttendance.API/SmartAttendance.API.csproj
+COPY SmartAttendance.API.csproj ./
+RUN dotnet restore
 
-# Copy all source files and build
-COPY . ./SmartAttendance.API/
-WORKDIR /src/SmartAttendance.API
-RUN dotnet build SmartAttendance.API.csproj -c Release -o /app/build
+# Copy all source files
+COPY . .
+
+# Build and publish
+WORKDIR /src
 RUN dotnet publish SmartAttendance.API.csproj -c Release -o /app/publish
 
 # Stage 2: Runtime
-# Use ASP.NET Core runtime for running the application
 FROM mcr.microsoft.com/dotnet/aspnet:8.0 AS final
 
 WORKDIR /app
 
-# Install curl for health checks (optional, can be removed for smaller image)
+# Install curl for health checks
 RUN apt-get update && apt-get install -y --no-install-recommends curl \
     && rm -rf /var/lib/apt/lists/*
 
@@ -50,7 +48,7 @@ ENV PORT=5000
 
 # Health check
 HEALTHCHECK --interval=30s --timeout=10s --start-period=5s --retries=3 \
-    CMD curl -f http://localhost:5000/api/auth/health || exit 1
+    CMD curl -f http://localhost:5000/health || exit 1
 
 # Entry point
 ENTRYPOINT ["dotnet", "SmartAttendance.API.dll"]
