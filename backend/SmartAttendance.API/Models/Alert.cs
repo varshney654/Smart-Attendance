@@ -4,6 +4,7 @@ using MongoDB.Bson.Serialization.Attributes;
 
 namespace SmartAttendance.API.Models
 {
+    [BsonIgnoreExtraElements]
     public class Alert
     {
         [BsonId]

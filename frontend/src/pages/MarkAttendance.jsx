@@ -1,5 +1,6 @@
 import React, { useState, useRef, useEffect, useCallback } from 'react';
 import Webcam from 'react-webcam';
+import * as faceapi from '@vladmandic/face-api';
 import api from '../utils/api';
 import { Camera, CameraOff, UserCircle } from 'lucide-react';
 
@@ -10,10 +11,12 @@ const MarkAttendance = () => {
   const [cameraActive, setCameraActive] = useState(false);
   const [aiMessage, setAiMessage] = useState('');
   const [loading, setLoading] = useState(false);
+  const [modelsLoaded, setModelsLoaded] = useState(false);
   const webcamRef = useRef(null);
 
   useEffect(() => {
     fetchUsers();
+    loadModels();
   }, []);
 
   const fetchUsers = async () => {
@@ -22,6 +25,20 @@ const MarkAttendance = () => {
       setUsers(res.data);
     } catch (err) {
       console.error(err);
+    }
+  };
+
+  const loadModels = async () => {
+    try {
+      setAiMessage('Loading AI Models...');
+      await faceapi.nets.tinyFaceDetector.loadFromUri('/models');
+      await faceapi.nets.faceLandmark68Net.loadFromUri('/models');
+      await faceapi.nets.faceRecognitionNet.loadFromUri('/models');
+      setModelsLoaded(true);
+      setAiMessage('');
+    } catch (err) {
+      console.error('Failed to load AI models. Details:', err);
+      setAiMessage('Failed to load AI models. Check console.');
     }
   };
 
@@ -46,42 +63,106 @@ const MarkAttendance = () => {
     }
   };
 
+  // Fetch face data on load
+  const [registeredFaces, setRegisteredFaces] = useState([]);
+  
+  useEffect(() => {
+    // We fetch global models here...
+    const fetchFaceData = async () => {
+      try {
+        const res = await api.get('/face/data');
+        setRegisteredFaces(res.data);
+      } catch (err) {
+        console.error('Failed to load face data from server:', err);
+      }
+    };
+    fetchFaceData();
+  }, []);
+
   const capture = useCallback(async () => {
-    const imageSrc = webcamRef.current.getScreenshot();
-    if (!imageSrc) return;
+    console.log('[MarkAttendance] Capture & Match clicked');
+    if (!webcamRef.current || !webcamRef.current.video || !modelsLoaded) {
+      console.log('[MarkAttendance] Error: Camera or models not ready.');
+      setAiMessage('Camera or models not ready.');
+      return;
+    }
+
+    if (registeredFaces.length === 0) {
+      setAiMessage('No users with registered faces found in database.');
+      return;
+    }
 
     setAiMessage('Scanning face...');
+    console.log('[MarkAttendance] Scanning face...');
     setLoading(true);
 
-    // Simulate AI delay and API integration
-    setTimeout(async () => {
-      try {
-        // Mock random user detection for demo
-        if (users.length === 0) {
-          setAiMessage('No users in database.');
-          return;
+    try {
+      const videoEl = webcamRef.current.video;
+      console.log(`[MarkAttendance] Starting detection. Video dimensions: ${videoEl.videoWidth}x${videoEl.videoHeight}`);
+      
+      const options = new faceapi.TinyFaceDetectorOptions({ inputSize: 416, scoreThreshold: 0.2 });
+      const detection = await faceapi.detectSingleFace(videoEl, options)
+        .withFaceLandmarks()
+        .withFaceDescriptor();
+
+      if (!detection) {
+        console.log('[MarkAttendance] Detection Result: null (No face detected)');
+        setAiMessage('No face detected. Please look at the camera.');
+        setTimeout(() => setAiMessage(''), 3000);
+        setLoading(false);
+        return;
+      }
+
+      console.log('[MarkAttendance] Face detected! Descriptor generated.');
+      setAiMessage('Analyzing face parameters...');
+
+      const currentDescriptor = Array.from(detection.descriptor);
+      let bestMatch = null;
+      let minDistance = Number.MAX_VALUE;
+
+      // Loop through all users
+      for (const user of registeredFaces) {
+        for (const dbEmbedding of user.faceData) {
+          // Compare using Euclidean Distance in the frontend
+          const distance = faceapi.euclideanDistance(currentDescriptor, dbEmbedding);
+          if (distance < minDistance) {
+            minDistance = distance;
+            bestMatch = user;
+          }
         }
+      }
 
-        const randomUser = users[Math.floor(Math.random() * users.length)];
-        const confidenceScore = Math.floor(Math.random() * (99 - 85 + 1) + 85); // 85% to 99%
+      const threshold = 0.5; // Tune 0.4-0.6
+      console.log(`[MarkAttendance] Best match: ${bestMatch?.name} with distance ${minDistance}`);
 
+      if (bestMatch && minDistance <= threshold) {
+        const confidence = Math.max(0, (1 - (minDistance / threshold)) * 100).toFixed(2);
+        console.log(`[MarkAttendance] Match found for userId: ${bestMatch.userId} (${confidence}%)`);
+        
+        console.log('[MarkAttendance] Sending to backend (Attendance)');
+        const now = new Date();
         await api.post('/attendance/mark', {
-          userId: randomUser.id,
+          userId: bestMatch.userId,
+          time: now.toTimeString().split(' ')[0],
           status: 'Present',
-          method: 'AI Recognition',
-          confidence: confidenceScore,
-          time: new Date().toLocaleTimeString('en-US', { hour12: false, hour: '2-digit', minute: '2-digit' })
+          method: 'AI',
+          confidence: parseFloat(confidence)
         });
 
-        setAiMessage(`Matched: ${randomUser.name} (${confidenceScore}% confidence)`);
-        setTimeout(() => setAiMessage(''), 3000); // Clear message after 3s
-      } catch (err) {
-        setAiMessage('Recognition failed.');
-      } finally {
-        setLoading(false);
+        setAiMessage(`Matched: ${bestMatch.name} (${confidence}% confidence). Attendance Marked!`);
+      } else {
+        console.log('[MarkAttendance] Best face distance exceeded threshold (unrecognized)');
+        setAiMessage('User not recognized.');
       }
-    }, 1500);
-  }, [webcamRef, users]);
+      setTimeout(() => setAiMessage(''), 4000);
+    } catch (err) {
+      console.error('[MarkAttendance] Error during capture/match:', err);
+      setAiMessage(err.response?.data?.message || 'Recognition failed due to a server error.');
+      setTimeout(() => setAiMessage(''), 4000);
+    } finally {
+      setLoading(false);
+    }
+  }, [webcamRef, modelsLoaded, registeredFaces]);
 
   return (
     <div>
@@ -100,7 +181,9 @@ const MarkAttendance = () => {
             </div>
             <div>
               <h3 style={{ fontSize: '1.125rem', margin: 0 }}>AI Face Recognition</h3>
-              <p style={{ fontSize: '0.875rem', color: 'var(--text-muted)' }}>Automated attendance marking</p>
+              <p style={{ fontSize: '0.875rem', color: 'var(--text-muted)' }}>
+                {modelsLoaded ? 'Models Loaded. Ready for scanning' : 'Loading AI Models...'}
+              </p>
             </div>
           </div>
 
@@ -153,6 +236,7 @@ const MarkAttendance = () => {
               className="btn btn-primary" 
               style={{ flex: 1 }}
               onClick={() => setCameraActive(!cameraActive)}
+              disabled={!modelsLoaded}
             >
               <Camera size={18} />
               {cameraActive ? 'Stop Camera' : 'Start Camera'}
@@ -161,7 +245,7 @@ const MarkAttendance = () => {
               className="btn btn-secondary" 
               style={{ flex: 1 }}
               onClick={capture}
-              disabled={!cameraActive || loading}
+              disabled={!cameraActive || loading || !modelsLoaded}
             >
                Capture & Match
             </button>

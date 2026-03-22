@@ -26,6 +26,7 @@ const Sidebar = () => {
 
   if (user?.role === 'Admin') {
     links.splice(4, 0, { to: '/users', label: 'Manage Users', icon: <Users size={20} /> });
+    links.splice(5, 0, { to: '/register-face', label: 'Register Face', icon: <Camera size={20} /> });
   }
 
   return (

@@ -3,6 +3,7 @@ using MongoDB.Bson.Serialization.Attributes;
 
 namespace SmartAttendance.API.Models
 {
+    [BsonIgnoreExtraElements]
     public class User
     {
         [BsonId]
@@ -23,5 +24,8 @@ namespace SmartAttendance.API.Models
 
         [BsonElement("department")]
         public string? Department { get; set; }
+
+        [BsonElement("faceData")]
+        public List<double[]> FaceData { get; set; } = new List<double[]>();
     }
 }

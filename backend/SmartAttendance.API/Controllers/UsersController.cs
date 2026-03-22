@@ -22,12 +22,16 @@ namespace SmartAttendance.API.Controllers
         public async Task<IActionResult> GetUsers()
         {
             var users = await _mongoService.Users.Find(_ => true).ToListAsync();
-            // Sanitize passwords
-            foreach (var user in users)
+            var result = users.Select(u => new
             {
-                user.Password = "";
-            }
-            return Ok(users);
+                id = u.Id,
+                name = u.Name,
+                email = u.Email,
+                role = u.Role,
+                department = u.Department,
+                hasFaceData = u.FaceData != null && u.FaceData.Any()
+            });
+            return Ok(result);
         }
 
         [HttpGet("{id}")]
@@ -36,8 +40,15 @@ namespace SmartAttendance.API.Controllers
             var user = await _mongoService.Users.Find(u => u.Id == id).FirstOrDefaultAsync();
             if (user == null) return NotFound(new { message = "User not found" });
 
-            user.Password = "";
-            return Ok(user);
+            return Ok(new
+            {
+                id = user.Id,
+                name = user.Name,
+                email = user.Email,
+                role = user.Role,
+                department = user.Department,
+                hasFaceData = user.FaceData != null && user.FaceData.Any()
+            });
         }
 
         [HttpPost]

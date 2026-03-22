@@ -1,13 +1,20 @@
 import React, { useState, useEffect } from 'react';
 import api from '../utils/api';
-import { Pencil, Trash2, UserPlus, Search } from 'lucide-react';
+import { Pencil, Trash2, UserPlus, Search, Camera, Check, X } from 'lucide-react';
+import FaceRegistrationModal from '../components/FaceRegistrationModal';
 
 const ManageUsers = () => {
   const [users, setUsers] = useState([]);
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState('');
+  
+  // User Form Modal State
   const [showModal, setShowModal] = useState(false);
   const [currentUser, setCurrentUser] = useState(null);
+  
+  // Face Registration Modal State
+  const [showFaceModal, setShowFaceModal] = useState(false);
+  const [faceUser, setFaceUser] = useState(null); // { id, name }
   
   // Form State
   const [name, setName] = useState('');
@@ -58,6 +65,11 @@ const ManageUsers = () => {
     setShowModal(true);
   };
 
+  const openFaceModal = (user) => {
+    setFaceUser({ id: user.id, name: user.name });
+    setShowFaceModal(true);
+  };
+
   const handleDelete = async (id) => {
     if (window.confirm('Delete this user?')) {
       try {
@@ -77,12 +89,18 @@ const ManageUsers = () => {
         const payload = { name, email, role, department };
         if (password) payload.password = password;
         await api.put(`/users/${currentUser.id}`, payload);
+        setShowModal(false);
+        fetchUsers();
       } else {
-        // Create (usually uses register, but we have a POST /users if we hooked it up to create directly)
-        await api.post('/auth/register', { name, email, password, role, department });
+        // Create User using POST /users to get full User object with id back
+        const res = await api.post('/users', { name, email, password, role, department });
+        setShowModal(false);
+        fetchUsers();
+        
+        // Step 1: Automatically trigger Face Registration Modal for newly created user
+        setFaceUser({ id: res.data.id, name: res.data.name });
+        setShowFaceModal(true);
       }
-      setShowModal(false);
-      fetchUsers();
     } catch (err) {
       alert(err.response?.data?.message || 'Action failed');
     }
@@ -128,14 +146,15 @@ const ManageUsers = () => {
                 <th>Email</th>
                 <th>Role</th>
                 <th>Department</th>
+                <th>Face Status</th>
                 <th style={{ textAlign: 'right' }}>Actions</th>
               </tr>
             </thead>
             <tbody>
               {loading ? (
-                <tr><td colSpan="5" style={{ textAlign: 'center', padding: '2rem' }}>Loading users...</td></tr>
+                <tr><td colSpan="6" style={{ textAlign: 'center', padding: '2rem' }}>Loading users...</td></tr>
               ) : filteredUsers.length === 0 ? (
-                <tr><td colSpan="5" style={{ textAlign: 'center', padding: '2rem' }}>No users found</td></tr>
+                <tr><td colSpan="6" style={{ textAlign: 'center', padding: '2rem' }}>No users found</td></tr>
               ) : (
                 filteredUsers.map(user => (
                   <tr key={user.id}>
@@ -154,12 +173,30 @@ const ManageUsers = () => {
                       </span>
                     </td>
                     <td style={{ color: 'var(--text-muted)' }}>{user.department || '-'}</td>
+                    <td>
+                      {user.hasFaceData ? (
+                        <span style={{ display: 'flex', alignItems: 'center', gap: '0.25rem', color: 'var(--success)', fontSize: '0.875rem', fontWeight: 500 }}>
+                          <Check size={16} /> Registered
+                        </span>
+                      ) : (
+                        <span style={{ display: 'flex', alignItems: 'center', gap: '0.25rem', color: 'var(--text-muted)', fontSize: '0.875rem', fontWeight: 500 }}>
+                          <X size={16} /> Not Registered
+                        </span>
+                      )}
+                    </td>
                     <td style={{ textAlign: 'right' }}>
                       <div style={{ display: 'flex', gap: '0.5rem', justifyContent: 'flex-end' }}>
-                        <button style={{ color: 'var(--primary)', padding: '0.5rem' }} onClick={() => openEditModal(user)} aria-label="Edit user">
+                        <button 
+                          style={{ color: user.hasFaceData ? 'var(--success)' : 'var(--text-muted)', padding: '0.5rem', border: '1px solid var(--border)', borderRadius: '4px', backgroundColor: 'transparent', cursor: 'pointer' }} 
+                          onClick={() => openFaceModal(user)} 
+                          title="Register Face"
+                        >
+                          <Camera size={16} style={{ display: 'block' }} />
+                        </button>
+                        <button style={{ color: 'var(--primary)', padding: '0.5rem', border: 'none', background: 'none', cursor: 'pointer' }} onClick={() => openEditModal(user)} aria-label="Edit user">
                           <Pencil size={18} />
                         </button>
-                        <button style={{ color: 'var(--danger)', padding: '0.5rem' }} onClick={() => handleDelete(user.id)} aria-label="Delete user">
+                        <button style={{ color: 'var(--danger)', padding: '0.5rem', border: 'none', background: 'none', cursor: 'pointer' }} onClick={() => handleDelete(user.id)} aria-label="Delete user">
                           <Trash2 size={18} />
                         </button>
                       </div>
@@ -172,6 +209,7 @@ const ManageUsers = () => {
         </div>
       </div>
 
+      {/* User Form Modal */}
       {showModal && (
         <div style={{
           position: 'fixed',
@@ -180,7 +218,7 @@ const ManageUsers = () => {
           display: 'flex',
           alignItems: 'center',
           justifyContent: 'center',
-          zIndex: 50,
+          zIndex: 40,
           backdropFilter: 'blur(4px)'
         }}>
           <div className="card animate-fade-in" style={{ width: '100%', maxWidth: '500px', backgroundColor: 'var(--surface)' }}>
@@ -221,6 +259,25 @@ const ManageUsers = () => {
             </form>
           </div>
         </div>
+      )}
+
+      {/* Face Registration Modal */}
+      {showFaceModal && faceUser && (
+        <FaceRegistrationModal 
+          userId={faceUser.id}
+          userName={faceUser.name}
+          onClose={() => {
+            setShowFaceModal(false);
+            setFaceUser(null);
+            alert("Face not registered. AI attendance will not work for this user.");
+            fetchUsers();
+          }}
+          onSuccess={() => {
+            setShowFaceModal(false);
+            setFaceUser(null);
+            fetchUsers();
+          }}
+        />
       )}
     </div>
   );

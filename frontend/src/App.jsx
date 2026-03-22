@@ -10,6 +10,7 @@ import Analytics from './pages/Analytics';
 import ManageUsers from './pages/ManageUsers';
 import Reports from './pages/Reports';
 import Alerts from './pages/Alerts';
+import RegisterFace from './pages/RegisterFace';
 
 const ProtectedRoute = ({ children, roles }) => {
   const { user } = useContext(AuthContext);
@@ -42,6 +43,7 @@ function App() {
         <Route path="records" element={<Records />} />
         <Route path="analytics" element={<Analytics />} />
         <Route path="users" element={<ProtectedRoute roles={['Admin']}><ManageUsers /></ProtectedRoute>} />
+        <Route path="register-face" element={<ProtectedRoute roles={['Admin']}><RegisterFace /></ProtectedRoute>} />
         <Route path="reports" element={<Reports />} />
         <Route path="alerts" element={<Alerts />} />
       </Route>
