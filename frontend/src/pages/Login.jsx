@@ -1,18 +1,14 @@
 import React, { useState, useContext } from 'react';
 import { AuthContext } from '../context/AuthContext';
 import api from '../utils/api';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, Link } from 'react-router-dom';
 import { Camera, User, Briefcase, GraduationCap } from 'lucide-react';
 
 const Login = () => {
-  const [isLogin, setIsLogin] = useState(true);
-  
   // Form state
-  const [name, setName] = useState('');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [role, setRole] = useState('Student'); // Default to Student as requested
-  const [department, setDepartment] = useState('');
   
   const [error, setError] = useState('');
   const [success, setSuccess] = useState('');
@@ -38,28 +34,21 @@ const Login = () => {
     }
 
     try {
-      if (isLogin) {
-        const response = await api.post('/auth/login', { email, password, role });
-        login(response.data.user, response.data.token);
-        
-        // Redirect intelligently based exactly on the Role requested by User prompt
-        if (response.data.user.role === 'Admin') {
-          navigate('/dashboard');
-        } else if (response.data.user.role === 'Student') {
-          navigate('/mark-attendance');
-        } else if (response.data.user.role === 'Employee') {
-          navigate('/employee-dashboard');
-        } else {
-          navigate('/'); // Fallback
-        }
+      const response = await api.post('/auth/login', { email, password, role });
+      login(response.data.user, response.data.token);
+      
+      // Redirect intelligently based exactly on the Role requested by User prompt
+      if (response.data.user.role === 'Admin') {
+        navigate('/dashboard');
+      } else if (response.data.user.role === 'Student') {
+        navigate('/mark-attendance');
+      } else if (response.data.user.role === 'Employee') {
+        navigate('/employee-dashboard');
       } else {
-        await api.post('/auth/register', { name, email, password, role, department });
-        setSuccess('Registration successful! Please sign in.');
-        setIsLogin(true);
-        setPassword('');
+        navigate('/'); // Fallback
       }
     } catch (err) {
-      setError(err.response?.data?.message || `Failed to ${isLogin ? 'login' : 'register'}`);
+      setError(err.response?.data?.message || `Failed to sign in securely.`);
     } finally {
       setLoading(false);
     }
@@ -87,10 +76,10 @@ const Login = () => {
             <Camera size={32} />
           </div>
           <h2 style={{ fontSize: '1.5rem', textAlign: 'center', color: 'var(--text-main)', margin: 0 }}>
-            {isLogin ? 'Welcome Back' : 'Create Account'}
+            Welcome Back
           </h2>
           <p style={{ color: 'var(--text-muted)', margin: '0.25rem 0 0' }}>
-            {isLogin ? 'Sign in to Smart Attendance' : 'Register for Smart Attendance'}
+            Sign in to Smart Attendance
           </p>
         </div>
 
@@ -215,21 +204,6 @@ const Login = () => {
             </div>
           </div>
 
-          {!isLogin && (
-            <div className="input-group">
-              <label className="input-label" htmlFor="name">Full Name</label>
-              <input 
-                id="name"
-                type="text" 
-                className="input-field" 
-                placeholder="John Doe"
-                value={name}
-                onChange={(e) => setName(e.target.value)}
-                required
-              />
-            </div>
-          )}
-
           <div className="input-group">
             <label className="input-label" htmlFor="email">Email</label>
             <input 
@@ -243,68 +217,34 @@ const Login = () => {
             />
           </div>
           
-          <div className="input-group" style={{ marginBottom: isLogin ? '1.5rem' : '1rem' }}>
-            <label className="input-label" htmlFor="password">Password</label>
+          <div className="input-group" style={{ marginBottom: '1rem' }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+              <label className="input-label" htmlFor="password" style={{ marginBottom: 0 }}>Password</label>
+              <Link to="/forgot-password" style={{ fontSize: '0.875rem', color: 'var(--primary)', textDecoration: 'none', fontWeight: 500 }}>
+                Forgot Password?
+              </Link>
+            </div>
             <input 
               id="password"
               type="password" 
               className="input-field" 
+              style={{ marginTop: '0.5rem' }}
               placeholder="••••••••"
               value={password}
               onChange={(e) => setPassword(e.target.value)}
               required
-              minLength={6}
             />
           </div>
-
-          {!isLogin && role !== 'Admin' && (
-            <div className="input-group" style={{ marginBottom: '1.5rem' }}>
-              <label className="input-label" htmlFor="department">Department</label>
-              <input 
-                id="department"
-                type="text" 
-                className="input-field" 
-                placeholder="IT / Science"
-                value={department}
-                onChange={(e) => setDepartment(e.target.value)}
-              />
-            </div>
-          )}
 
           <button 
             type="submit" 
             className="btn btn-primary" 
-            style={{ width: '100%', padding: '0.875rem', fontSize: '1rem', marginTop: '0.5rem' }}
+            style={{ width: '100%', padding: '0.875rem', fontSize: '1rem', marginTop: '1rem' }}
             disabled={loading}
           >
-            {loading ? 'Processing...' : (isLogin ? 'Sign In' : 'Register')}
+            {loading ? 'Authenticating...' : 'Sign In To Proceed'}
           </button>
         </form>
-
-        <div style={{ marginTop: '1.5rem', textAlign: 'center', fontSize: '0.875rem' }}>
-          <span style={{ color: 'var(--text-muted)' }}>
-            {isLogin ? "Don't have an account? " : "Already have an account? "}
-          </span>
-          <button 
-            type="button"
-            onClick={() => {
-              setIsLogin(!isLogin);
-              setError('');
-              setSuccess('');
-            }}
-            style={{
-              color: 'var(--primary)',
-              fontWeight: 600,
-              display: 'inline-block',
-              background: 'none',
-              border: 'none',
-              cursor: 'pointer',
-              padding: 0
-            }}
-          >
-            {isLogin ? "Register now" : "Sign in"}
-          </button>
-        </div>
       </div>
     </div>
   );

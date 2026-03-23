@@ -71,6 +71,94 @@ namespace SmartAttendance.API.Controllers
             });
         }
 
+        [HttpPost("send-reset-code")]
+        public async Task<IActionResult> SendResetCode([FromBody] ResetRequestDto request)
+        {
+            var user = await _users.FindByEmailAsync(request.Email);
+            if (user == null)
+            {
+                return Ok(new { success = true, message = "OTP sent to your email" });
+            }
+
+            var otp = new Random().Next(100000, 999999).ToString();
+            user.ResetOtp = BCrypt.Net.BCrypt.HashPassword(otp);
+            user.ResetOtpExpiry = DateTime.UtcNow.AddMinutes(10);
+            
+            if (user.Id != null)
+            {
+                await _users.UpdateAsync(user.Id, user);
+            }
+
+            try
+            {
+                Console.WriteLine($"[DEBUG] Generated OTP for {request.Email}: {otp}");
+                Console.WriteLine("[SMTP] Connecting to Gmail SMTP...");
+
+                using var smtpClient = new System.Net.Mail.SmtpClient("smtp.gmail.com", 587)
+                {
+                    EnableSsl = true,
+                    UseDefaultCredentials = false,
+                    Credentials = new System.Net.NetworkCredential("ajayvarshney2429@gmail.com", "dzcetjdsnxcqrutjye")
+                };
+
+                Console.WriteLine("[SMTP] Authenticating...");
+
+                var mailMessage = new System.Net.Mail.MailMessage
+                {
+                    From = new System.Net.Mail.MailAddress("ajayvarshney2429@gmail.com", "Smart Attendance System"),
+                    Subject = "Password Reset OTP",
+                    Body = $"<p>Your password reset code is: <strong>{otp}</strong></p><p>This code will expire securely in exactly 10 minutes.</p>",
+                    IsBodyHtml = true
+                };
+                mailMessage.To.Add(request.Email);
+
+                Console.WriteLine("[SMTP] Sending mail...");
+                smtpClient.Send(mailMessage);
+                Console.WriteLine("[SMTP] EMAIL SENT SUCCESS");
+                
+                return Ok(new { success = true, message = "OTP sent to your email" });
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine($"[SMTP ERROR] Gmail Rejection Reason: {ex.Message}");
+                if (ex.InnerException != null) 
+                {
+                    Console.WriteLine($"[SMTP ERROR] Inner Exception: {ex.InnerException.Message}");
+                }
+                Console.WriteLine($"[SMTP ERROR] Stack Trace: {ex.StackTrace}");
+                
+                return StatusCode(500, new { success = false, message = "Failed to send OTP email" });
+            }
+        }
+
+        [HttpPost("reset-password")]
+        public async Task<IActionResult> ResetPassword([FromBody] ResetPasswordDto request)
+        {
+            var user = await _users.FindByEmailAsync(request.Email);
+
+            if (user == null || user.ResetOtp == null || !BCrypt.Net.BCrypt.Verify(request.Otp, user.ResetOtp))
+            {
+                return BadRequest(new { success = false, message = "Invalid or expired reset code." });
+            }
+
+            if (user.ResetOtpExpiry == null || DateTime.UtcNow > user.ResetOtpExpiry)
+            {
+                return BadRequest(new { success = false, message = "Reset code has securely expired after 10 minutes." });
+            }
+
+            // OTP Verified. Execute Hash override.
+            user.Password = BCrypt.Net.BCrypt.HashPassword(request.NewPassword);
+            user.ResetOtp = null;
+            user.ResetOtpExpiry = null;
+
+            if (user.Id != null)
+            {
+                await _users.UpdateAsync(user.Id, user);
+            }
+
+            return Ok(new { message = "Password has been successfully updated!" });
+        }
+
         private string GenerateJwtToken(User user)
         {
             var jwtSecret = Environment.GetEnvironmentVariable("JWT_SECRET") ?? "FallbackSecretKey123!@#_MakeItLongEnough";

@@ -66,6 +66,45 @@ namespace SmartAttendance.API.Controllers
         {
             try
             {
+                var loggedInUserId = User.FindFirst(System.Security.Claims.ClaimTypes.NameIdentifier)?.Value;
+                var loggedInRole = User.FindFirst(System.Security.Claims.ClaimTypes.Role)?.Value;
+
+                if (loggedInRole != "Admin" && dto.UserId != loggedInUserId)
+                {
+                    return Unauthorized(new { success = false, message = "Security Exception: You can only exclusively mark attendance for your own authorized account." });
+                }
+
+                if (dto.Method == "AI")
+                {
+                    if (dto.FaceDescriptor == null || dto.FaceDescriptor.Count == 0)
+                        return BadRequest(new { success = false, message = "No facial biometric descriptor was transmitted to the backend." });
+
+                    var targetUser = await _mongoService.Users.Find(u => u.Id == dto.UserId).FirstOrDefaultAsync();
+                    if (targetUser == null || targetUser.FaceData == null || targetUser.FaceData.Count == 0)
+                        return BadRequest(new { success = false, message = "The selected user has absolutely no biometric templates securely registered." });
+
+                    bool isMatch = false;
+                    double minDistance = double.MaxValue;
+
+                    foreach (var embedding in targetUser.FaceData)
+                    {
+                        double distance = EuclideanDistance(embedding, dto.FaceDescriptor);
+                        if (distance < minDistance) minDistance = distance;
+                        
+                        if (distance < 0.5) 
+                        {
+                            isMatch = true;
+                            break;
+                        }
+                    }
+
+                    if (!isMatch)
+                    {
+                        // Strict rejection
+                        return BadRequest(new { success = false, message = $"Face does not match selected user." });
+                    }
+                }
+
                 var today = DateTime.UtcNow.Date;
 
                 // 1. Enforce one attendance entry per user per day
@@ -115,6 +154,17 @@ namespace SmartAttendance.API.Controllers
                 _logger.LogError(ex, "A critical error occurred while attempting to mathematically map and log the attendance vector into MongoDB.");
                 return StatusCode(500, new { success = false, message = "Failed due to server error" });
             }
+        }
+
+        private double EuclideanDistance(double[] source, List<double> target)
+        {
+            if (source.Length != target.Count) return double.MaxValue;
+            double sum = 0;
+            for (int i = 0; i < source.Length; i++)
+            {
+                sum += Math.Pow(source[i] - target[i], 2);
+            }
+            return Math.Sqrt(sum);
         }
 
         private async Task CreateAlertIfPatternDetected(string userId, string status)

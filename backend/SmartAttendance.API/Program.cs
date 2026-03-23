@@ -102,4 +102,45 @@ app.Urls.Add($"http://0.0.0.0:{port}");
 // Add a simple health check endpoint for Render
 app.MapGet("/health", () => Results.Ok(new { status = "healthy", timestamp = DateTime.UtcNow }));
 
+// --- SMTP DIAGNOSTIC BOOT TEST ---
+Console.WriteLine("\n[DIAGNOSTIC] Executing Startup SMTP Ping Test...");
+try
+{
+    Console.WriteLine("[DIAGNOSTIC] Connecting to Gmail SMTP...");
+    using var smtpClient = new System.Net.Mail.SmtpClient("smtp.gmail.com", 587)
+    {
+        EnableSsl = true,
+        UseDefaultCredentials = false,
+        Credentials = new System.Net.NetworkCredential("ajayvarshney2429@gmail.com", "dzcetjdsnxcqrutjye")
+    };
+
+    Console.WriteLine("[DIAGNOSTIC] Authenticating...");
+    var mailMessage = new System.Net.Mail.MailMessage
+    {
+        From = new System.Net.Mail.MailAddress("ajayvarshney2429@gmail.com", "Smart Attendance System"),
+        Subject = "Diagnostic Verification",
+        Body = "SMTP connection verified.",
+        IsBodyHtml = false
+    };
+    mailMessage.To.Add("ajayvarshney2429@gmail.com");
+
+    Console.WriteLine("[DIAGNOSTIC] Sending mail...");
+    smtpClient.Send(mailMessage);
+    Console.WriteLine("[DIAGNOSTIC] EMAIL SENT SUCCESS");
+}
+catch (Exception ex)
+{
+    Console.WriteLine($"[DIAGNOSTIC] Gmail Rejection Reason: {ex.Message}");
+    if (ex.InnerException != null)
+    {
+        Console.WriteLine($"[DIAGNOSTIC] Inner Exception: {ex.InnerException.Message}");
+    }
+    if (ex.Message.Contains("less secure app", StringComparison.OrdinalIgnoreCase))
+    {
+        Console.WriteLine("[DIAGNOSTIC] Gmail blocked less secure access.");
+    }
+    Console.WriteLine($"[DIAGNOSTIC] Stack Trace: {ex.StackTrace}");
+}
+Console.WriteLine("--------------------------------------------------\n");
+
 app.Run();

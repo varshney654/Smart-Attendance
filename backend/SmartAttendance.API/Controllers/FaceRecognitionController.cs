@@ -33,6 +33,29 @@ namespace SmartAttendance.API.Controllers
                 if (dto.FaceData == null || !dto.FaceData.Any())
                     return BadRequest(new { message = "No face data provided." });
 
+                // Cross-verification loop to strictly prevent duplicate Identity registrations
+                var allEnrolledUsers = await _mongoService.Users.Find(u => u.FaceData != null && u.FaceData.Any()).ToListAsync();
+                
+                foreach (var user in allEnrolledUsers)
+                {
+                    // Allow the user to overwrite their own FaceData safely
+                    if (user.Id == dto.UserId) continue;
+
+                    // Evaluate every new sample array against every existing sample array
+                    foreach (var existingEmbedding in user.FaceData)
+                    {
+                        foreach (var incomingEmbedding in dto.FaceData)
+                        {
+                            double distance = EuclideanDistance(existingEmbedding, incomingEmbedding);
+                            if (distance < 0.5)
+                            {
+                                // A mathematical match was found against a DIFFERENT user in the database
+                                return BadRequest(new { message = "Face already registered to another user in the system." });
+                            }
+                        }
+                    }
+                }
+
                 var update = Builders<User>.Update.Set(u => u.FaceData, dto.FaceData);
                 var result = await _mongoService.Users.UpdateOneAsync(u => u.Id == dto.UserId, update);
 
@@ -45,6 +68,17 @@ namespace SmartAttendance.API.Controllers
             {
                 return StatusCode(500, new { message = "Error occurred during registration: " + ex.Message });
             }
+        }
+
+        private double EuclideanDistance(double[] source, double[] target)
+        {
+            if (source.Length != target.Length) return double.MaxValue;
+            double sum = 0;
+            for (int i = 0; i < source.Length; i++)
+            {
+                sum += Math.Pow(source[i] - target[i], 2);
+            }
+            return Math.Sqrt(sum);
         }
 
         [HttpGet("data")]

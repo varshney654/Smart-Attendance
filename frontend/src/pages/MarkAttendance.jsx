@@ -79,6 +79,11 @@ const MarkAttendance = () => {
 
   const capture = useCallback(async () => {
     console.log('[MarkAttendance] Capture & Match clicked');
+    if (!selectedUser) {
+      setAiMessage('SECURITY HALT: You must explicitly select your user profile identity first.');
+      return;
+    }
+    
     if (!webcamRef.current || !webcamRef.current.video || !modelsLoaded) {
       console.log('[MarkAttendance] Error: Camera or models not ready.');
       setAiMessage('Camera or models not ready.');
@@ -90,8 +95,14 @@ const MarkAttendance = () => {
       return;
     }
 
-    setAiMessage('Scanning face...');
-    console.log('[MarkAttendance] Scanning face...');
+    const targetUser = registeredFaces.find(u => u.userId === selectedUser);
+    if (!targetUser || !targetUser.faceData || targetUser.faceData.length === 0) {
+      setAiMessage('The selected user completely lacks a biometric facial template.');
+      return;
+    }
+
+    setAiMessage('Scanning face against Target Identity...');
+    console.log(`[MarkAttendance] Scanning specifically for Identity: ${targetUser.name}`);
     setLoading(true);
 
     try {
@@ -112,62 +123,58 @@ const MarkAttendance = () => {
       }
 
       console.log('[MarkAttendance] Face detected');
-      console.log('[MarkAttendance] Detected Face Descriptor (128 array):', Array.from(detection.descriptor));
-      setAiMessage('Face detected! Matching...');
-
       const currentDescriptor = Array.from(detection.descriptor);
-      let bestMatch = null;
+      console.log('[MarkAttendance] Detected Face Descriptor (128 array):', currentDescriptor);
+      setAiMessage('Face detected! Running 1:1 Verification Model...');
+
       let minDistance = Number.MAX_VALUE;
 
-      // Loop through all users
-      for (const user of registeredFaces) {
-        for (let i = 0; i < user.faceData.length; i++) {
-          const dbEmbedding = user.faceData[i];
-          const distance = faceapi.euclideanDistance(currentDescriptor, dbEmbedding);
-          
-          console.log(`[MarkAttendance] Comparing with User '${user.name}' (Sample ${i+1}/${user.faceData.length}). Distance: ${distance.toFixed(4)}`);
-          
-          if (distance < minDistance) {
-            minDistance = distance;
-            bestMatch = user;
-          }
+      // EXPLICIT 1:1 Matching
+      for (let i = 0; i < targetUser.faceData.length; i++) {
+        const dbEmbedding = targetUser.faceData[i];
+        const distance = faceapi.euclideanDistance(currentDescriptor, dbEmbedding);
+        
+        console.log(`[MarkAttendance] Verifying Target '${targetUser.name}' (Sample ${i+1}/${targetUser.faceData.length}). Distance: ${distance.toFixed(4)}`);
+        
+        if (distance < minDistance) {
+          minDistance = distance;
         }
       }
 
-      const threshold = 0.6; // Increased threshold to 0.6 to prevent false negatives per user prompt
-      console.log(`[MarkAttendance] Best match evaluated: ${bestMatch?.name} with distance ${minDistance.toFixed(4)}`);
-      console.log(`[MarkAttendance] Stored Embeddings for matched user:`, bestMatch?.faceData);
+      const threshold = 0.5; // Strictly clamped back to 0.5 for explicit security
+      console.log(`[MarkAttendance] Target matched evaluated for: ${targetUser.name} with distance ${minDistance.toFixed(4)}`);
 
-      if (bestMatch && minDistance <= threshold) {
+      if (minDistance <= threshold) {
         const confidence = Math.max(0, (1 - (minDistance / threshold)) * 100).toFixed(2);
-        console.log(`[MarkAttendance] Match found for userId: ${bestMatch.userId} (${confidence}%)`);
-        setAiMessage('Match found! Verifying attendance with server...');
+        console.log(`[MarkAttendance] Strict 1:1 Identity Confirmed for: ${targetUser.userId} (${confidence}%)`);
+        setAiMessage('1:1 Match Verified! Bridging payload to .NET Core securely...');
         
-        console.log('[MarkAttendance] Sending to backend (Attendance)');
+        console.log('[MarkAttendance] Sending raw arrays to backend (Attendance)');
         
         // Status and Time omitted to enforce strict server-side authentication timelines
         const res = await api.post('/attendance/mark', {
-          userId: bestMatch.userId,
+          userId: targetUser.userId,
           method: 'AI',
-          confidence: parseFloat(confidence)
+          confidence: parseFloat(confidence),
+          faceDescriptor: currentDescriptor // Proxied to C# for rigorous duplicate checking
         });
 
         // Use the authenticated result explicitly from the C# backend!
-        setAiMessage(`Matched: ${bestMatch.name} (${confidence}%). ${res.data.message}`);
+        setAiMessage(`Verified: ${targetUser.name} (${confidence}%). ${res.data.message}`);
       } else {
-        console.log(`[MarkAttendance] Best face distance (${minDistance.toFixed(4)}) exceeded threshold of ${threshold} (unrecognized)`);
-        setAiMessage('No match. Face not recognized.');
+        console.log(`[MarkAttendance] Best face distance (${minDistance.toFixed(4)}) explicitly rejected against threshold of ${threshold}`);
+        setAiMessage(`Biometric mismatch. Identity rejected. Distance: ${minDistance.toFixed(4)}`);
       }
-      setTimeout(() => setAiMessage(''), 4000);
+      setTimeout(() => setAiMessage(''), 6000);
     } catch (err) {
       console.error('[MarkAttendance] Error during capture/match:', err);
       // Effectively catches 400 Bad Requests if already signed in earlier today.
       setAiMessage(err.response?.data?.message || 'Recognition failed due to a server error.');
-      setTimeout(() => setAiMessage(''), 4000);
+      setTimeout(() => setAiMessage(''), 6000);
     } finally {
       setLoading(false);
     }
-  }, [webcamRef, modelsLoaded, registeredFaces]);
+  }, [webcamRef, modelsLoaded, registeredFaces, selectedUser]);
 
   return (
     <div>
@@ -176,18 +183,41 @@ const MarkAttendance = () => {
         <p style={{ color: 'var(--text-muted)' }}>Automated time-based execution strictly authenticated by the backend.</p>
       </div>
 
+      <div className="card glass" style={{ marginBottom: '2rem', padding: '1.5rem', background: 'linear-gradient(to right, rgba(99, 102, 241, 0.05), rgba(168, 85, 247, 0.05))', border: '1px solid rgba(99, 102, 241, 0.1)' }}>
+        <div className="input-group" style={{ marginBottom: 0 }}>
+          <label className="input-label" htmlFor="globalUserSelect" style={{ color: 'var(--primary)', fontWeight: 600 }}>Target Identity (Who are you?)</label>
+          <select 
+            id="globalUserSelect"
+            className="input-field" 
+            value={selectedUser} 
+            onChange={(e) => setSelectedUser(e.target.value)}
+            style={{ fontSize: '1.1rem', padding: '0.75rem 1rem', borderColor: 'var(--primary)' }}
+            required
+          >
+            <option value="">Choose an authorized profile to verify against...</option>
+            {users.map(u => (
+              <option key={u.id} value={u.id}>{u.name} ({u.role})</option>
+            ))}
+          </select>
+        </div>
+      </div>
+
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(400px, 1fr))', gap: '2rem' }}>
         
         {/* AI Camera Section */}
-        <div className="card glass animate-fade-in">
+        <div className="card glass animate-fade-in" style={{ 
+          opacity: selectedUser ? 1 : 0.5, 
+          transition: 'opacity 0.3s ease',
+          pointerEvents: selectedUser ? 'auto' : 'none' 
+        }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', marginBottom: '1.5rem' }}>
             <div style={{ backgroundColor: 'rgba(99, 102, 241, 0.1)', color: 'var(--primary)', padding: '0.5rem', borderRadius: '0.5rem' }}>
               <Camera size={24} />
             </div>
             <div>
-              <h3 style={{ fontSize: '1.125rem', margin: 0 }}>AI Face Recognition</h3>
+              <h3 style={{ fontSize: '1.125rem', margin: 0 }}>Strict 1:1 Facial Verification</h3>
               <p style={{ fontSize: '0.875rem', color: 'var(--text-muted)' }}>
-                {modelsLoaded ? 'Models Loaded. Ready for scanning' : 'Loading AI Models...'}
+                {modelsLoaded ? 'Secure mapping module activated' : 'Loading AI Models...'}
               </p>
             </div>
           </div>
@@ -218,12 +248,14 @@ const MarkAttendance = () => {
                     bottom: '1rem', 
                     left: '50%', 
                     transform: 'translateX(-50%)',
-                    backgroundColor: 'rgba(0,0,0,0.7)',
+                    backgroundColor: 'rgba(0,0,0,0.85)',
                     color: 'white',
-                    padding: '0.5rem 1rem',
-                    borderRadius: '99px',
+                    padding: '0.75rem 1.25rem',
+                    borderRadius: '0.5rem',
                     fontSize: '0.875rem',
-                    zIndex: 10
+                    zIndex: 10,
+                    fontWeight: 500,
+                    border: '1px solid rgba(255,255,255,0.1)'
                   }}>
                     {aiMessage}
                   </div>
@@ -232,7 +264,7 @@ const MarkAttendance = () => {
             ) : (
               <div style={{ textAlign: 'center', color: 'var(--text-muted)' }}>
                 <CameraOff size={48} style={{ margin: '0 auto 0.5rem', opacity: 0.5 }} />
-                <p>Camera is off</p>
+                <p>Camera is tightly secured</p>
               </div>
             )}
           </div>
@@ -245,15 +277,15 @@ const MarkAttendance = () => {
               disabled={!modelsLoaded}
             >
               <Camera size={18} />
-              {cameraActive ? 'Stop Camera' : 'Start Camera'}
+              {cameraActive ? 'Stop Biometrics' : 'Awake Neural Net'}
             </button>
             <button 
               className="btn btn-secondary" 
-              style={{ flex: 1 }}
+              style={{ flex: 1, backgroundColor: 'var(--success)', color: 'white' }}
               onClick={capture}
               disabled={!cameraActive || loading || !modelsLoaded}
             >
-               Capture & Match
+               Verify Identity Payload
             </button>
           </div>
         </div>
@@ -265,35 +297,19 @@ const MarkAttendance = () => {
               <UserCircle size={24} />
             </div>
             <div>
-              <h3 style={{ fontSize: '1.125rem', margin: 0 }}>Manual Entry</h3>
+              <h3 style={{ fontSize: '1.125rem', margin: 0 }}>Manual Override Entry</h3>
               <p style={{ fontSize: '0.875rem', color: 'var(--text-muted)' }}>Status will be evaluated dynamically via the Backend.</p>
             </div>
           </div>
 
           <form onSubmit={handleManualSubmit}>
-            <div className="input-group" style={{ marginBottom: '1.5rem' }}>
-              <label className="input-label" htmlFor="userSelect">Select User</label>
-              <select 
-                id="userSelect"
-                className="input-field" 
-                value={selectedUser} 
-                onChange={(e) => setSelectedUser(e.target.value)}
-                required
-              >
-                <option value="">Choose a user...</option>
-                {users.map(u => (
-                  <option key={u.id} value={u.id}>{u.name} ({u.role})</option>
-                ))}
-              </select>
-            </div>
-
             <button 
               type="submit" 
               className="btn btn-primary" 
-              style={{ width: '100%', background: 'linear-gradient(135deg, #a855f7, var(--primary))', boxShadow: '0 4px 14px 0 rgba(168, 85, 247, 0.39)' }}
-              disabled={loading}
+              style={{ width: '100%', background: 'linear-gradient(135deg, #a855f7, var(--primary))', boxShadow: '0 4px 14px 0 rgba(168, 85, 247, 0.39)', marginTop: '2rem' }}
+              disabled={loading || !selectedUser}
             >
-              {loading ? 'Processing...' : 'Securely Mark Attendance'}
+              {loading ? 'Processing...' : 'Bypass Security (Admin Override)'}
             </button>
           </form>
         </div>
