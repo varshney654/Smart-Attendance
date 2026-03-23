@@ -7,7 +7,6 @@ import { Camera, CameraOff, UserCircle } from 'lucide-react';
 const MarkAttendance = () => {
   const [users, setUsers] = useState([]);
   const [selectedUser, setSelectedUser] = useState('');
-  const [status, setStatus] = useState('Present');
   const [cameraActive, setCameraActive] = useState(false);
   const [aiMessage, setAiMessage] = useState('');
   const [loading, setLoading] = useState(false);
@@ -48,16 +47,15 @@ const MarkAttendance = () => {
     
     setLoading(true);
     try {
-      await api.post('/attendance/mark', {
+      // NOTE: Status and Time are intentionally omitted! The .NET Server acts as the ultimate truth.
+      const res = await api.post('/attendance/mark', {
         userId: selectedUser,
-        status: status,
-        method: 'Manual',
-        time: new Date().toLocaleTimeString('en-US', { hour12: false, hour: '2-digit', minute: '2-digit' })
+        method: 'Manual'
       });
-      alert('Attendance marked manually');
+      alert(res.data.message); // Will say "Attendance automatically marked as Present/Late"
       setSelectedUser('');
     } catch (err) {
-      alert('Failed to mark manual attendance');
+      alert(err.response?.data?.message || 'Failed to mark manual attendance');
     } finally {
       setLoading(false);
     }
@@ -107,14 +105,15 @@ const MarkAttendance = () => {
 
       if (!detection) {
         console.log('[MarkAttendance] Detection Result: null (No face detected)');
-        setAiMessage('No face detected. Please look at the camera.');
+        setAiMessage('No face detected. Please make sure your face is clearly visible and well-lit.');
         setTimeout(() => setAiMessage(''), 3000);
         setLoading(false);
         return;
       }
 
-      console.log('[MarkAttendance] Face detected! Descriptor generated.');
-      setAiMessage('Analyzing face parameters...');
+      console.log('[MarkAttendance] Face detected');
+      console.log('[MarkAttendance] Detected Face Descriptor (128 array):', Array.from(detection.descriptor));
+      setAiMessage('Face detected! Matching...');
 
       const currentDescriptor = Array.from(detection.descriptor);
       let bestMatch = null;
@@ -122,9 +121,12 @@ const MarkAttendance = () => {
 
       // Loop through all users
       for (const user of registeredFaces) {
-        for (const dbEmbedding of user.faceData) {
-          // Compare using Euclidean Distance in the frontend
+        for (let i = 0; i < user.faceData.length; i++) {
+          const dbEmbedding = user.faceData[i];
           const distance = faceapi.euclideanDistance(currentDescriptor, dbEmbedding);
+          
+          console.log(`[MarkAttendance] Comparing with User '${user.name}' (Sample ${i+1}/${user.faceData.length}). Distance: ${distance.toFixed(4)}`);
+          
           if (distance < minDistance) {
             minDistance = distance;
             bestMatch = user;
@@ -132,31 +134,34 @@ const MarkAttendance = () => {
         }
       }
 
-      const threshold = 0.5; // Tune 0.4-0.6
-      console.log(`[MarkAttendance] Best match: ${bestMatch?.name} with distance ${minDistance}`);
+      const threshold = 0.6; // Increased threshold to 0.6 to prevent false negatives per user prompt
+      console.log(`[MarkAttendance] Best match evaluated: ${bestMatch?.name} with distance ${minDistance.toFixed(4)}`);
+      console.log(`[MarkAttendance] Stored Embeddings for matched user:`, bestMatch?.faceData);
 
       if (bestMatch && minDistance <= threshold) {
         const confidence = Math.max(0, (1 - (minDistance / threshold)) * 100).toFixed(2);
         console.log(`[MarkAttendance] Match found for userId: ${bestMatch.userId} (${confidence}%)`);
+        setAiMessage('Match found! Verifying attendance with server...');
         
         console.log('[MarkAttendance] Sending to backend (Attendance)');
-        const now = new Date();
-        await api.post('/attendance/mark', {
+        
+        // Status and Time omitted to enforce strict server-side authentication timelines
+        const res = await api.post('/attendance/mark', {
           userId: bestMatch.userId,
-          time: now.toTimeString().split(' ')[0],
-          status: 'Present',
           method: 'AI',
           confidence: parseFloat(confidence)
         });
 
-        setAiMessage(`Matched: ${bestMatch.name} (${confidence}% confidence). Attendance Marked!`);
+        // Use the authenticated result explicitly from the C# backend!
+        setAiMessage(`Matched: ${bestMatch.name} (${confidence}%). ${res.data.message}`);
       } else {
-        console.log('[MarkAttendance] Best face distance exceeded threshold (unrecognized)');
-        setAiMessage('User not recognized.');
+        console.log(`[MarkAttendance] Best face distance (${minDistance.toFixed(4)}) exceeded threshold of ${threshold} (unrecognized)`);
+        setAiMessage('No match. Face not recognized.');
       }
       setTimeout(() => setAiMessage(''), 4000);
     } catch (err) {
       console.error('[MarkAttendance] Error during capture/match:', err);
+      // Effectively catches 400 Bad Requests if already signed in earlier today.
       setAiMessage(err.response?.data?.message || 'Recognition failed due to a server error.');
       setTimeout(() => setAiMessage(''), 4000);
     } finally {
@@ -168,7 +173,7 @@ const MarkAttendance = () => {
     <div>
       <div style={{ marginBottom: '2rem' }}>
         <h1 style={{ fontSize: '1.875rem', marginBottom: '0.5rem' }}>Mark Attendance</h1>
-        <p style={{ color: 'var(--text-muted)' }}>Record attendance using face recognition or manual entry</p>
+        <p style={{ color: 'var(--text-muted)' }}>Automated time-based execution strictly authenticated by the backend.</p>
       </div>
 
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(400px, 1fr))', gap: '2rem' }}>
@@ -204,6 +209,7 @@ const MarkAttendance = () => {
                   audio={false}
                   ref={webcamRef}
                   screenshotFormat="image/jpeg"
+                  videoConstraints={{ width: 1280, height: 720, facingMode: "user" }}
                   style={{ width: '100%', height: '100%', objectFit: 'cover' }}
                 />
                 {aiMessage && (
@@ -260,12 +266,12 @@ const MarkAttendance = () => {
             </div>
             <div>
               <h3 style={{ fontSize: '1.125rem', margin: 0 }}>Manual Entry</h3>
-              <p style={{ fontSize: '0.875rem', color: 'var(--text-muted)' }}>Mark attendance manually</p>
+              <p style={{ fontSize: '0.875rem', color: 'var(--text-muted)' }}>Status will be evaluated dynamically via the Backend.</p>
             </div>
           </div>
 
           <form onSubmit={handleManualSubmit}>
-            <div className="input-group">
+            <div className="input-group" style={{ marginBottom: '1.5rem' }}>
               <label className="input-label" htmlFor="userSelect">Select User</label>
               <select 
                 id="userSelect"
@@ -281,51 +287,13 @@ const MarkAttendance = () => {
               </select>
             </div>
 
-            <div className="input-group" style={{ marginBottom: '1.5rem' }}>
-              <label className="input-label">Status</label>
-              <div style={{ display: 'flex', gap: '1rem' }}>
-                <button
-                  type="button"
-                  onClick={() => setStatus('Present')}
-                  style={{
-                    flex: 1,
-                    padding: '0.75rem',
-                    borderRadius: '0.5rem',
-                    border: `1px solid ${status === 'Present' ? 'var(--success)' : 'var(--border)'}`,
-                    backgroundColor: status === 'Present' ? 'rgba(16, 185, 129, 0.1)' : 'transparent',
-                    color: status === 'Present' ? 'var(--success)' : 'var(--text-main)',
-                    fontWeight: 500
-                  }}
-                >
-                  <span style={{ display: 'inline-block', width: '8px', height: '8px', borderRadius: '50%', backgroundColor: 'var(--success)', marginRight: '0.5rem' }}></span>
-                  Present
-                </button>
-                <button
-                  type="button"
-                  onClick={() => setStatus('Late')}
-                  style={{
-                    flex: 1,
-                    padding: '0.75rem',
-                    borderRadius: '0.5rem',
-                    border: `1px solid ${status === 'Late' ? 'var(--warning)' : 'var(--border)'}`,
-                    backgroundColor: status === 'Late' ? 'rgba(245, 158, 11, 0.1)' : 'transparent',
-                    color: status === 'Late' ? 'var(--warning)' : 'var(--text-main)',
-                    fontWeight: 500
-                  }}
-                >
-                  <span style={{ display: 'inline-block', width: '8px', height: '8px', borderRadius: '50%', backgroundColor: 'var(--warning)', marginRight: '0.5rem' }}></span>
-                  Late
-                </button>
-              </div>
-            </div>
-
             <button 
               type="submit" 
               className="btn btn-primary" 
               style={{ width: '100%', background: 'linear-gradient(135deg, #a855f7, var(--primary))', boxShadow: '0 4px 14px 0 rgba(168, 85, 247, 0.39)' }}
               disabled={loading}
             >
-              {loading ? 'Processing...' : 'Mark Attendance'}
+              {loading ? 'Processing...' : 'Securely Mark Attendance'}
             </button>
           </form>
         </div>

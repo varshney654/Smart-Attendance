@@ -32,6 +32,9 @@ builder.Services.AddSingleton<PrismaDbContext>(sp =>
     return new PrismaDbContext(mongoClient, "SmartAttendance");
 });
 
+// Register Scheduled Background Threads
+builder.Services.AddHostedService<SmartAttendance.API.BackgroundJobs.AutoAbsentService>();
+
 // Configure JWT Authentication
 var jwtSecret = Environment.GetEnvironmentVariable("JWT_SECRET") ?? "FallbackSecretKey123!@#_MakeItLongEnough";
 var key = Encoding.ASCII.GetBytes(jwtSecret);

@@ -12,10 +12,12 @@ namespace SmartAttendance.API.Controllers
     public class AttendanceController : ControllerBase
     {
         private readonly MongoDbService _mongoService;
+        private readonly ILogger<AttendanceController> _logger;
 
-        public AttendanceController(MongoDbService mongoService)
+        public AttendanceController(MongoDbService mongoService, ILogger<AttendanceController> logger)
         {
             _mongoService = mongoService;
+            _logger = logger;
         }
 
         [HttpGet]
@@ -60,18 +62,59 @@ namespace SmartAttendance.API.Controllers
         }
 
         [HttpPost("mark")]
-        public async Task<IActionResult> MarkAttendance([FromBody] Attendance attendance)
+        public async Task<IActionResult> MarkAttendance([FromBody] DTOs.MarkAttendanceDto dto)
         {
-            attendance.Date = DateTime.UtcNow.Date; // Store only date component
-            
-            // Generate Alerts if necessary e.g., Late
-            if (attendance.Status == "Late" || attendance.Status == "Absent")
+            try
             {
-                await CreateAlertIfPatternDetected(attendance.UserId, attendance.Status);
-            }
+                var today = DateTime.UtcNow.Date;
 
-            await _mongoService.Attendances.InsertOneAsync(attendance);
-            return Ok(new { message = "Attendance marked successfully.", attendance });
+                // 1. Enforce one attendance entry per user per day
+                var existingRecord = await _mongoService.Attendances
+                    .Find(a => a.UserId == dto.UserId && a.Date == today)
+                    .FirstOrDefaultAsync();
+
+                if (existingRecord != null)
+                {
+                    return BadRequest(new { success = false, message = "Attendance already marked for today." });
+                }
+
+                // 2. Automatically calculate Status using explicit Server Time
+                // (Assuming local server timezone, configuring to 10:00:00 AM threshold)
+                var currentTime = DateTime.Now;
+                var thresholdTime = new TimeSpan(10, 0, 0);
+
+                var attendance = new Attendance
+                {
+                    UserId = dto.UserId,
+                    Date = today,
+                    Time = currentTime.ToString("HH:mm:ss"),
+                    Method = dto.Method,
+                    Confidence = dto.Confidence
+                };
+                
+                if (currentTime.TimeOfDay <= thresholdTime)
+                {
+                    attendance.Status = "Present";
+                }
+                else
+                {
+                    attendance.Status = "Late";
+                }
+                
+                // Generate Alerts if necessary e.g., Late
+                if (attendance.Status == "Late")
+                {
+                    await CreateAlertIfPatternDetected(attendance.UserId, attendance.Status);
+                }
+
+                await _mongoService.Attendances.InsertOneAsync(attendance);
+                return Ok(new { success = true, status = attendance.Status, message = $"Attendance marked as {attendance.Status}.", attendance });
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "A critical error occurred while attempting to mathematically map and log the attendance vector into MongoDB.");
+                return StatusCode(500, new { success = false, message = "Failed due to server error" });
+            }
         }
 
         private async Task CreateAlertIfPatternDetected(string userId, string status)

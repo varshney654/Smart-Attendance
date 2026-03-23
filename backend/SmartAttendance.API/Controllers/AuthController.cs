@@ -56,6 +56,9 @@ namespace SmartAttendance.API.Controllers
             if (user == null || !BCrypt.Net.BCrypt.Verify(loginDto.Password, user.Password))
                 return Unauthorized(new { message = "Invalid email or password" });
 
+            if (!string.Equals(user.Role, loginDto.Role, StringComparison.OrdinalIgnoreCase))
+                return Unauthorized(new { message = "Invalid role selected for this account" });
+
             var token = GenerateJwtToken(user);
 
             // Do not send password back
