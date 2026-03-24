@@ -1,10 +1,14 @@
-import React, { useState, useRef, useEffect, useCallback } from 'react';
+import React, { useState, useRef, useEffect, useCallback, useContext } from 'react';
 import Webcam from 'react-webcam';
 import * as faceapi from '@vladmandic/face-api';
 import api from '../utils/api';
 import { Camera, CameraOff, UserCircle } from 'lucide-react';
+import { AuthContext } from '../context/AuthContext';
 
 const MarkAttendance = () => {
+  const { user } = useContext(AuthContext);
+  const isAdmin = user?.role === 'Admin';
+
   const [users, setUsers] = useState([]);
   const [selectedUser, setSelectedUser] = useState('');
   const [cameraActive, setCameraActive] = useState(false);
@@ -38,6 +42,12 @@ const MarkAttendance = () => {
     fetchUsers();
     loadModels();
   }, []);
+
+  useEffect(() => {
+    if (!isAdmin && user) {
+      setSelectedUser(user.id);
+    }
+  }, [isAdmin, user]);
 
   const fetchUsers = async () => {
     try {
@@ -264,19 +274,32 @@ const MarkAttendance = () => {
       <div className="card glass" style={{ marginBottom: '2rem', padding: '1.5rem', background: 'linear-gradient(to right, rgba(99, 102, 241, 0.05), rgba(168, 85, 247, 0.05))', border: '1px solid rgba(99, 102, 241, 0.1)' }}>
         <div className="input-group" style={{ marginBottom: 0 }}>
           <label className="input-label" htmlFor="globalUserSelect" style={{ color: 'var(--primary)', fontWeight: 600 }}>Target Identity (Who are you?)</label>
-          <select 
-            id="globalUserSelect"
-            className="input-field" 
-            value={selectedUser} 
-            onChange={(e) => setSelectedUser(e.target.value)}
-            style={{ fontSize: '1.1rem', padding: '0.75rem 1rem', borderColor: 'var(--primary)' }}
-            required
-          >
-            <option value="">Choose an authorized profile to verify against...</option>
-            {users.map(u => (
-              <option key={u.id} value={u.id}>{u.name} ({u.role})</option>
-            ))}
-          </select>
+          {isAdmin ? (
+            <select 
+              id="globalUserSelect"
+              className="input-field" 
+              value={selectedUser} 
+              onChange={(e) => setSelectedUser(e.target.value)}
+              style={{ fontSize: '1.1rem', padding: '0.75rem 1rem', borderColor: 'var(--primary)' }}
+              required
+            >
+              <option value="">Choose an authorized profile to verify against...</option>
+              {users.map(u => (
+                <option key={u.id} value={u.id}>{u.name} ({u.role})</option>
+              ))}
+            </select>
+          ) : (
+            <div>
+              <input 
+                type="text" 
+                className="input-field" 
+                value={`${user?.name || 'Loading Name...'} (${user?.role || 'Loading Role...'})`} 
+                disabled 
+                style={{ fontSize: '1.1rem', padding: '0.75rem 1rem', borderColor: 'var(--border)', backgroundColor: '#f1f5f9', color: 'var(--text-muted)' }}
+              />
+              <p style={{ fontSize: '0.8rem', color: 'var(--text-muted)', marginTop: '0.5rem' }}>Attendance will be automatically linked natively to your authenticated account.</p>
+            </div>
+          )}
         </div>
       </div>
 
@@ -376,28 +399,30 @@ const MarkAttendance = () => {
         </div>
 
         {/* Manual Entry Section */}
-        <div className="card glass animate-fade-in" style={{ animationDelay: '0.1s' }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', marginBottom: '1.5rem' }}>
-            <div style={{ backgroundColor: 'rgba(236, 72, 153, 0.1)', color: 'var(--secondary)', padding: '0.5rem', borderRadius: '0.5rem' }}>
-              <UserCircle size={24} />
+        {isAdmin && (
+          <div className="card glass animate-fade-in" style={{ animationDelay: '0.1s' }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', marginBottom: '1.5rem' }}>
+              <div style={{ backgroundColor: 'rgba(236, 72, 153, 0.1)', color: 'var(--secondary)', padding: '0.5rem', borderRadius: '0.5rem' }}>
+                <UserCircle size={24} />
+              </div>
+              <div>
+                <h3 style={{ fontSize: '1.125rem', margin: 0 }}>Manual Override Entry</h3>
+                <p style={{ fontSize: '0.875rem', color: 'var(--text-muted)' }}>Status will be evaluated dynamically via the Backend.</p>
+              </div>
             </div>
-            <div>
-              <h3 style={{ fontSize: '1.125rem', margin: 0 }}>Manual Override Entry</h3>
-              <p style={{ fontSize: '0.875rem', color: 'var(--text-muted)' }}>Status will be evaluated dynamically via the Backend.</p>
-            </div>
-          </div>
 
-          <form onSubmit={handleManualSubmit}>
-            <button 
-              type="submit" 
-              className="btn btn-primary" 
-              style={{ width: '100%', background: 'linear-gradient(135deg, #a855f7, var(--primary))', boxShadow: '0 4px 14px 0 rgba(168, 85, 247, 0.39)', marginTop: '2rem' }}
-              disabled={loading || !selectedUser}
-            >
-              {loading ? 'Processing...' : 'Bypass Security (Admin Override)'}
-            </button>
-          </form>
-        </div>
+            <form onSubmit={handleManualSubmit}>
+              <button 
+                type="submit" 
+                className="btn btn-primary" 
+                style={{ width: '100%', background: 'linear-gradient(135deg, #a855f7, var(--primary))', boxShadow: '0 4px 14px 0 rgba(168, 85, 247, 0.39)', marginTop: '2rem' }}
+                disabled={loading || !selectedUser}
+              >
+                {loading ? 'Processing...' : 'Bypass Security (Admin Override)'}
+              </button>
+            </form>
+          </div>
+        )}
 
       </div>
     </div>

@@ -69,9 +69,14 @@ namespace SmartAttendance.API.Controllers
                 var loggedInUserId = User.FindFirst(System.Security.Claims.ClaimTypes.NameIdentifier)?.Value;
                 var loggedInRole = User.FindFirst(System.Security.Claims.ClaimTypes.Role)?.Value;
 
-                if (loggedInRole != "Admin" && dto.UserId != loggedInUserId)
+                if (loggedInRole != "Admin")
                 {
-                    return Unauthorized(new { success = false, message = "Security Exception: You can only exclusively mark attendance for your own authorized account." });
+                    if (string.IsNullOrEmpty(loggedInUserId))
+                    {
+                        return Unauthorized(new { success = false, message = "Security Exception: Authentic JWT Token does not carry a verifiable NameIdentifier." });
+                    }
+                    // Explicitly force the action strictly unto the authenticated user's physical payload
+                    dto.UserId = loggedInUserId;
                 }
 
                 if (dto.Method == "AI")
