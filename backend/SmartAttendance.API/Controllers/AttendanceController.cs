@@ -76,6 +76,11 @@ namespace SmartAttendance.API.Controllers
 
                 if (dto.Method == "AI")
                 {
+                    if (!dto.IsLive)
+                    {
+                        return BadRequest(new { success = false, message = "Liveness verification failed. Fake attempt detected." });
+                    }
+
                     if (dto.FaceDescriptor == null || dto.FaceDescriptor.Count == 0)
                         return BadRequest(new { success = false, message = "No facial biometric descriptor was transmitted to the backend." });
 
@@ -165,6 +170,86 @@ namespace SmartAttendance.API.Controllers
                 sum += Math.Pow(source[i] - target[i], 2);
             }
             return Math.Sqrt(sum);
+        }
+
+        [HttpPost("manual")]
+        [Authorize(Roles = "Admin")]
+        public async Task<IActionResult> AddManualAttendance([FromBody] DTOs.AddAttendanceDto dto)
+        {
+            try
+            {
+                var targetDate = dto.Date.Date;
+                var existingRecord = await _mongoService.Attendances
+                    .Find(a => a.UserId == dto.UserId && a.Date == targetDate)
+                    .FirstOrDefaultAsync();
+
+                if (existingRecord != null)
+                {
+                    return BadRequest(new { success = false, message = "Attendance already marked for this user on this date." });
+                }
+
+                var attendance = new Attendance
+                {
+                    UserId = dto.UserId,
+                    Date = targetDate,
+                    Time = dto.Time,
+                    Method = "Manual",
+                    Confidence = null,
+                    Status = dto.Status
+                };
+
+                await _mongoService.Attendances.InsertOneAsync(attendance);
+                return Ok(new { success = true, message = "Manual attendance added successfully." });
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Error adding manual attendance.");
+                return StatusCode(500, new { success = false, message = "Server error." });
+            }
+        }
+
+        [HttpPut("{id}")]
+        [Authorize(Roles = "Admin")]
+        public async Task<IActionResult> UpdateAttendance(string id, [FromBody] DTOs.UpdateAttendanceDto dto)
+        {
+            try
+            {
+                var update = Builders<Attendance>.Update
+                    .Set(a => a.Status, dto.Status)
+                    .Set(a => a.Time, dto.Time);
+
+                var result = await _mongoService.Attendances.UpdateOneAsync(a => a.Id == id, update);
+
+                if (result.MatchedCount == 0)
+                    return NotFound(new { success = false, message = "Attendance record not found." });
+
+                return Ok(new { success = true, message = "Attendance updated successfully." });
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Error updating attendance.");
+                return StatusCode(500, new { success = false, message = "Server error: " + ex.Message });
+            }
+        }
+
+        [HttpDelete("{id}")]
+        [Authorize(Roles = "Admin")]
+        public async Task<IActionResult> DeleteAttendance(string id)
+        {
+            try
+            {
+                var result = await _mongoService.Attendances.DeleteOneAsync(a => a.Id == id);
+
+                if (result.DeletedCount == 0)
+                    return NotFound(new { success = false, message = "Attendance record not found." });
+
+                return Ok(new { success = true, message = "Attendance deleted successfully." });
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Error deleting attendance.");
+                return StatusCode(500, new { success = false, message = "Server error: " + ex.Message });
+            }
         }
 
         private async Task CreateAlertIfPatternDetected(string userId, string status)

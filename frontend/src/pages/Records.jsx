@@ -1,8 +1,12 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useContext } from 'react';
 import api from '../utils/api';
-import { Download, Search, Filter, Calendar } from 'lucide-react';
+import { Download, Search, Filter, Calendar, Plus, Edit, Trash2 } from 'lucide-react';
+import { AuthContext } from '../context/AuthContext';
 
 const Records = () => {
+  const { user } = useContext(AuthContext);
+  const isAdmin = user?.role === 'Admin';
+
   const [records, setRecords] = useState([]);
   const [loading, setLoading] = useState(true);
 
@@ -11,9 +15,31 @@ const Records = () => {
   const [status, setStatus] = useState('All Status');
   const [dateRange, setDateRange] = useState('All Time');
 
+  // Modal States
+  const [showModal, setShowModal] = useState(false);
+  const [modalMode, setModalMode] = useState('add');
+  const [selectedRecordId, setSelectedRecordId] = useState('');
+  const [users, setUsers] = useState([]);
+  const [formData, setFormData] = useState({
+    userId: '',
+    date: new Date().toISOString().split('T')[0],
+    time: '09:00',
+    status: 'Present'
+  });
+
   useEffect(() => {
     fetchRecords();
-  }, [status, dateRange]);
+    if (isAdmin) fetchUsers();
+  }, [status, dateRange, isAdmin]);
+
+  const fetchUsers = async () => {
+    try {
+      const res = await api.get('/users');
+      setUsers(res.data);
+    } catch (err) {
+      console.error(err);
+    }
+  };
 
   const fetchRecords = async () => {
     setLoading(true);
@@ -57,6 +83,63 @@ const Records = () => {
     }
   };
 
+  const openAddModal = () => {
+    setModalMode('add');
+    setFormData({ userId: '', date: new Date().toISOString().split('T')[0], time: '09:00', status: 'Present' });
+    setShowModal(true);
+  };
+
+  const openEditModal = (record) => {
+    setModalMode('edit');
+    setSelectedRecordId(record.id);
+    setFormData({
+      userId: record.userId,
+      date: new Date(record.date).toISOString().split('T')[0],
+      time: record.time.includes(':') && record.time.split(':').length === 3 ? record.time.substr(0, 5) : record.time,
+      status: record.status
+    });
+    setShowModal(true);
+  };
+
+  const handleSubmit = async (e) => {
+    e.preventDefault();
+    try {
+      if (modalMode === 'add') {
+        const payload = {
+            userId: formData.userId,
+            date: formData.date,
+            time: formData.time + (formData.time.split(':').length === 2 ? ':00' : ''),
+            status: formData.status
+        };
+        await api.post('/attendance/manual', payload);
+        alert('Attendance added successfully');
+      } else {
+        const payload = {
+            status: formData.status,
+            time: formData.time + (formData.time.split(':').length === 2 ? ':00' : '')
+        };
+        await api.put(`/attendance/${selectedRecordId}`, payload);
+        alert('Attendance updated successfully');
+      }
+      setShowModal(false);
+      fetchRecords();
+    } catch (err) {
+      console.error('Update Error:', err.response?.data || err.message);
+      alert(err.response?.data?.message || err.message || 'Failed to save attendance');
+    }
+  };
+
+  const handleDelete = async (id) => {
+    if (!window.confirm('Are you sure you want to delete this attendance record?')) return;
+    try {
+      await api.delete(`/attendance/${id}`);
+      fetchRecords();
+    } catch (err) {
+      console.error('Delete Error:', err.response?.data || err.message);
+      alert(err.response?.data?.message || err.message || 'Failed to delete attendance record');
+    }
+  };
+
   return (
     <div>
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '2rem' }}>
@@ -64,10 +147,16 @@ const Records = () => {
           <h1 style={{ fontSize: '1.875rem', marginBottom: '0.5rem' }}>Attendance Records</h1>
           <p style={{ color: 'var(--text-muted)' }}>View and filter all attendance entries</p>
         </div>
-        <button className="btn btn-success" style={{ backgroundColor: 'var(--success)', color: 'white' }} onClick={exportCSV}>
-          <Download size={18} />
-          Export CSV
-        </button>
+        <div style={{ display: 'flex', gap: '1rem' }}>
+          {isAdmin && (
+            <button className="btn btn-primary" onClick={openAddModal}>
+              <Plus size={18} /> Add Attendance
+            </button>
+          )}
+          <button className="btn btn-success" style={{ backgroundColor: 'var(--success)', color: 'white' }} onClick={exportCSV}>
+            <Download size={18} /> Export CSV
+          </button>
+        </div>
       </div>
 
       <div className="card glass animate-fade-in" style={{ padding: '0', overflow: 'hidden' }}>
@@ -126,6 +215,7 @@ const Records = () => {
                 <th>Status</th>
                 <th>Method</th>
                 <th>Confidence</th>
+                {isAdmin && <th>Actions</th>}
               </tr>
             </thead>
             <tbody>
@@ -145,7 +235,13 @@ const Records = () => {
                     <td>{record.time}</td>
                     <td style={{ fontWeight: 500 }}>{record.userName}</td>
                     <td>{getStatusBadge(record.status)}</td>
-                    <td>{record.method}</td>
+                    <td>
+                      {record.method === 'AI' ? (
+                        <span className="badge badge-success">AI Match</span>
+                      ) : (
+                        <span className="badge badge-warning">Manual</span>
+                      )}
+                    </td>
                     <td>
                       {record.confidence ? (
                         <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
@@ -162,6 +258,18 @@ const Records = () => {
                         <span style={{ color: 'var(--text-muted)' }}>N/A</span>
                       )}
                     </td>
+                    {isAdmin && (
+                      <td>
+                        <div style={{ display: 'flex', gap: '0.5rem' }}>
+                          <button style={{ background: 'none', border: 'none', color: 'var(--primary)', cursor: 'pointer' }} onClick={() => openEditModal(record)} title="Edit">
+                            <Edit size={18} />
+                          </button>
+                          <button style={{ background: 'none', border: 'none', color: 'var(--danger)', cursor: 'pointer' }} onClick={() => handleDelete(record.id)} title="Delete">
+                            <Trash2 size={18} />
+                          </button>
+                        </div>
+                      </td>
+                    )}
                   </tr>
                 ))
               )}
@@ -169,6 +277,83 @@ const Records = () => {
           </table>
         </div>
       </div>
+
+      {showModal && (
+        <div style={{
+          position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, 
+          backgroundColor: 'rgba(0,0,0,0.5)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 1000
+        }}>
+          <div className="card" style={{ width: '100%', maxWidth: '500px', backgroundColor: 'white', padding: '2rem', borderRadius: '1rem' }}>
+            <h2 style={{ marginBottom: '1.5rem', fontSize: '1.5rem' }}>
+              {modalMode === 'add' ? 'Add Manual Attendance' : 'Edit Attendance'}
+            </h2>
+            <form onSubmit={handleSubmit}>
+              <div className="input-group">
+                <label className="input-label">User</label>
+                <select 
+                  className="input-field" 
+                  value={formData.userId}
+                  onChange={(e) => setFormData({...formData, userId: e.target.value})}
+                  required
+                  disabled={modalMode === 'edit'}
+                >
+                  <option value="">Select User</option>
+                  {users.map(u => (
+                    <option key={u.id} value={u.id}>{u.name} ({u.email})</option>
+                  ))}
+                </select>
+              </div>
+              
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem' }}>
+                <div className="input-group">
+                  <label className="input-label">Date</label>
+                  <input 
+                    type="date" 
+                    className="input-field"
+                    value={formData.date}
+                    onChange={(e) => setFormData({...formData, date: e.target.value})}
+                    required
+                    disabled={modalMode === 'edit'}
+                  />
+                </div>
+                <div className="input-group">
+                  <label className="input-label">Time</label>
+                  <input 
+                    type="time" 
+                    className="input-field"
+                    value={formData.time}
+                    onChange={(e) => setFormData({...formData, time: e.target.value})}
+                    required
+                  />
+                </div>
+              </div>
+
+              <div className="input-group">
+                <label className="input-label">Status</label>
+                <select 
+                  className="input-field"
+                  value={formData.status}
+                  onChange={(e) => setFormData({...formData, status: e.target.value})}
+                  required
+                >
+                  <option value="Present">Present</option>
+                  <option value="Late">Late</option>
+                  <option value="Absent">Absent</option>
+                </select>
+              </div>
+
+              <div style={{ display: 'flex', gap: '1rem', marginTop: '2rem' }}>
+                <button type="button" className="btn btn-secondary" style={{ flex: 1 }} onClick={() => setShowModal(false)}>
+                  Cancel
+                </button>
+                <button type="submit" className="btn btn-primary" style={{ flex: 1 }}>
+                  {modalMode === 'add' ? 'Save Attendance' : 'Update Record'}
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
     </div>
   );
 };

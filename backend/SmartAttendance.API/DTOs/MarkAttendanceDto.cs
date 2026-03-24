@@ -6,5 +6,6 @@ namespace SmartAttendance.API.DTOs
         public string Method { get; set; } = "Manual";
         public double? Confidence { get; set; }
         public List<double>? FaceDescriptor { get; set; }
+        public bool IsLive { get; set; } = false;
     }
 }
