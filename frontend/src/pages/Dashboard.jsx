@@ -1,11 +1,13 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useContext } from 'react';
 import api from '../utils/api';
+import { AuthContext } from '../context/AuthContext';
 import { Users, UserCheck, UserX, TrendingUp } from 'lucide-react';
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip as RechartsTooltip, ResponsiveContainer, PieChart, Pie, Cell } from 'recharts';
 
 const COLORS = ['#10b981', '#f59e0b', '#ef4444']; // Present, Late, Absent
 
 const Dashboard = () => {
+  const { user } = useContext(AuthContext);
   const [data, setData] = useState(null);
   const [loading, setLoading] = useState(true);
 
@@ -35,9 +37,18 @@ const Dashboard = () => {
 
   return (
     <div>
-      <div style={{ marginBottom: '2rem' }}>
-        <h1 style={{ fontSize: '1.875rem', marginBottom: '0.5rem' }}>Dashboard Overview</h1>
-        <p style={{ color: 'var(--text-muted)' }}>Real-time attendance monitoring and analytics</p>
+      <div style={{ display: 'flex', alignItems: 'center', gap: '1.5rem', marginBottom: '2rem' }}>
+        {user?.profileImage ? (
+          <img src={user.profileImage} alt={user.name} style={{ width: '64px', height: '64px', borderRadius: '50%', objectFit: 'cover', border: '3px solid white', boxShadow: 'var(--shadow-md)' }} />
+        ) : (
+          <div style={{ width: '64px', height: '64px', borderRadius: '50%', backgroundColor: 'var(--primary)', color: 'white', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '1.5rem', fontWeight: 'bold', border: '3px solid white', boxShadow: 'var(--shadow-md)' }}>
+            {user?.name?.charAt(0) || 'U'}
+          </div>
+        )}
+        <div>
+          <h1 style={{ fontSize: '1.875rem', marginBottom: '0.25rem' }}>Welcome back, {user?.name}</h1>
+          <p style={{ color: 'var(--text-muted)', margin: 0 }}>Real-time attendance monitoring and analytics</p>
+        </div>
       </div>
 
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(240px, 1fr))', gap: '1.5rem', marginBottom: '2rem' }}>

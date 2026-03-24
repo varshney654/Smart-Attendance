@@ -22,6 +22,7 @@ const ManageUsers = () => {
   const [password, setPassword] = useState('');
   const [role, setRole] = useState('Student');
   const [department, setDepartment] = useState('');
+  const [profileImage, setProfileImage] = useState('');
 
   useEffect(() => {
     fetchUsers();
@@ -52,6 +53,7 @@ const ManageUsers = () => {
     setPassword('');
     setRole('Student');
     setDepartment('');
+    setProfileImage('');
     setShowModal(true);
   };
 
@@ -62,6 +64,7 @@ const ManageUsers = () => {
     setPassword(''); // leave blank info to indicate keep same
     setRole(user.role);
     setDepartment(user.department || '');
+    setProfileImage(user.profileImage || '');
     setShowModal(true);
   };
 
@@ -86,14 +89,14 @@ const ManageUsers = () => {
     try {
       if (currentUser) {
         // Update
-        const payload = { name, email, role, department };
+        const payload = { name, email, role, department, profileImage };
         if (password) payload.password = password;
         await api.put(`/users/${currentUser.id}`, payload);
         setShowModal(false);
         fetchUsers();
       } else {
         // Create User using POST /users to get full User object with id back
-        const res = await api.post('/users', { name, email, password, role, department });
+        const res = await api.post('/users', { name, email, password, role, department, profileImage });
         setShowModal(false);
         fetchUsers();
         
@@ -160,9 +163,13 @@ const ManageUsers = () => {
                   <tr key={user.id}>
                     <td>
                       <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
-                        <div style={{ width: '32px', height: '32px', borderRadius: '50%', backgroundColor: 'var(--primary)', color: 'white', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '0.875rem', fontWeight: 600 }}>
-                          {user.name.charAt(0)}
-                        </div>
+                        {user.profileImage ? (
+                          <img src={user.profileImage} alt={user.name} style={{ width: '32px', height: '32px', borderRadius: '50%', objectFit: 'cover', border: '1px solid var(--border)' }} />
+                        ) : (
+                          <div style={{ width: '32px', height: '32px', borderRadius: '50%', backgroundColor: 'var(--primary)', color: 'white', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '0.875rem', fontWeight: 600 }}>
+                            {user.name.charAt(0)}
+                          </div>
+                        )}
                         <span style={{ fontWeight: 500 }}>{user.name}</span>
                       </div>
                     </td>
@@ -232,6 +239,30 @@ const ManageUsers = () => {
               <div className="input-group">
                 <label className="input-label">Email</label>
                 <input type="email" className="input-field" value={email} onChange={e=>setEmail(e.target.value)} required />
+              </div>
+              <div className="input-group">
+                <label className="input-label">Profile Image <span style={{color:'var(--text-muted)', fontWeight:'normal'}}>(Max 1MB)</span></label>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '1rem' }}>
+                  {profileImage && (
+                    <img src={profileImage} alt="Preview" style={{ width: '40px', height: '40px', borderRadius: '50%', objectFit: 'cover', border: '1px solid var(--border)' }} />
+                  )}
+                  <input type="file" accept="image/*" className="input-field" onChange={(e) => {
+                    const file = e.target.files[0];
+                    if (file) {
+                      if (file.size > 1024 * 1024) {
+                        alert("File size must strictly be less than 1MB.");
+                        e.target.value = null;
+                        return;
+                      }
+                      const reader = new FileReader();
+                      reader.onloadend = () => setProfileImage(reader.result);
+                      reader.readAsDataURL(file);
+                    }
+                  }} style={{ padding: '0.4rem', flex: 1 }} />
+                  {profileImage && (
+                    <button type="button" onClick={() => setProfileImage('')} style={{ color: 'var(--danger)', background: 'none', border: 'none', cursor: 'pointer', fontSize: '0.875rem' }}>Clear</button>
+                  )}
+                </div>
               </div>
               <div className="input-group">
                 <label className="input-label">Password {currentUser && <span style={{color:'var(--text-muted)', fontWeight:'normal'}}>(Leave blank to keep current)</span>}</label>

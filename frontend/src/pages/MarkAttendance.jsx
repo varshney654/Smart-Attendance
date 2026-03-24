@@ -272,34 +272,49 @@ const MarkAttendance = () => {
       </div>
 
       <div className="card glass" style={{ marginBottom: '2rem', padding: '1.5rem', background: 'linear-gradient(to right, rgba(99, 102, 241, 0.05), rgba(168, 85, 247, 0.05))', border: '1px solid rgba(99, 102, 241, 0.1)' }}>
-        <div className="input-group" style={{ marginBottom: 0 }}>
-          <label className="input-label" htmlFor="globalUserSelect" style={{ color: 'var(--primary)', fontWeight: 600 }}>Target Identity (Who are you?)</label>
-          {isAdmin ? (
-            <select 
-              id="globalUserSelect"
-              className="input-field" 
-              value={selectedUser} 
-              onChange={(e) => setSelectedUser(e.target.value)}
-              style={{ fontSize: '1.1rem', padding: '0.75rem 1rem', borderColor: 'var(--primary)' }}
-              required
-            >
-              <option value="">Choose an authorized profile to verify against...</option>
-              {users.map(u => (
-                <option key={u.id} value={u.id}>{u.name} ({u.role})</option>
-              ))}
-            </select>
-          ) : (
-            <div>
-              <input 
-                type="text" 
+        <div className="input-group" style={{ marginBottom: 0, display: 'flex', alignItems: 'center', gap: '1.25rem' }}>
+          {(() => {
+            const target = users.find(u => u.id === selectedUser);
+            const displayImg = target?.profileImage || (!isAdmin ? user?.profileImage : null);
+            const initial = target?.name?.charAt(0) || (!isAdmin ? user?.name?.charAt(0) : 'U');
+            
+            return displayImg ? (
+              <img src={displayImg} alt="Target Identity" style={{ width: '56px', height: '56px', borderRadius: '50%', objectFit: 'cover', border: '2px solid var(--primary)' }} />
+            ) : (
+              <div style={{ width: '56px', height: '56px', borderRadius: '50%', backgroundColor: 'var(--primary)', color: 'white', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '1.5rem', fontWeight: 'bold' }}>
+                {initial}
+              </div>
+            );
+          })()}
+          <div style={{ flex: 1 }}>
+            <label className="input-label" htmlFor="globalUserSelect" style={{ color: 'var(--primary)', fontWeight: 600 }}>Target Identity (Who are you?)</label>
+            {isAdmin ? (
+              <select 
+                id="globalUserSelect"
                 className="input-field" 
-                value={`${user?.name || 'Loading Name...'} (${user?.role || 'Loading Role...'})`} 
-                disabled 
-                style={{ fontSize: '1.1rem', padding: '0.75rem 1rem', borderColor: 'var(--border)', backgroundColor: '#f1f5f9', color: 'var(--text-muted)' }}
-              />
-              <p style={{ fontSize: '0.8rem', color: 'var(--text-muted)', marginTop: '0.5rem' }}>Attendance will be automatically linked natively to your authenticated account.</p>
-            </div>
-          )}
+                value={selectedUser} 
+                onChange={(e) => setSelectedUser(e.target.value)}
+                style={{ fontSize: '1.1rem', padding: '0.75rem 1rem', borderColor: 'var(--primary)' }}
+                required
+              >
+                <option value="">Choose an authorized profile to verify against...</option>
+                {users.map(u => (
+                  <option key={u.id} value={u.id}>{u.name} ({u.role})</option>
+                ))}
+              </select>
+            ) : (
+              <div>
+                <input 
+                  type="text" 
+                  className="input-field" 
+                  value={`${user?.name || 'Loading Name...'} (${user?.role || 'Loading Role...'})`} 
+                  disabled 
+                  style={{ fontSize: '1.1rem', padding: '0.75rem 1rem', borderColor: 'var(--border)', backgroundColor: '#f1f5f9', color: 'var(--text-muted)' }}
+                />
+                <p style={{ fontSize: '0.8rem', color: 'var(--text-muted)', marginTop: '0.5rem' }}>Attendance will be automatically linked natively to your authenticated account.</p>
+              </div>
+            )}
+          </div>
         </div>
       </div>
 

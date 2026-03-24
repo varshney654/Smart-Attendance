@@ -38,6 +38,7 @@ namespace SmartAttendance.API.Controllers
                 Email = registerDto.Email,
                 Role = registerDto.Role,
                 Department = registerDto.Department,
+                ProfileImage = registerDto.ProfileImage,
                 Password = BCrypt.Net.BCrypt.HashPassword(registerDto.Password)
             };
 

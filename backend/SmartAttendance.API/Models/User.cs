@@ -31,6 +31,9 @@ namespace SmartAttendance.API.Models
         [BsonElement("resetOtpExpiry")]
         public DateTime? ResetOtpExpiry { get; set; }
 
+        [BsonElement("profileImage")]
+        public string? ProfileImage { get; set; }
+
         [BsonElement("faceData")]
         public List<double[]> FaceData { get; set; } = new List<double[]>();
     }

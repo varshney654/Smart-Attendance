@@ -29,6 +29,7 @@ namespace SmartAttendance.API.Controllers
                 email = u.Email,
                 role = u.Role,
                 department = u.Department,
+                profileImage = u.ProfileImage,
                 hasFaceData = u.FaceData != null && u.FaceData.Any()
             });
             return Ok(result);
@@ -47,6 +48,7 @@ namespace SmartAttendance.API.Controllers
                 email = user.Email,
                 role = user.Role,
                 department = user.Department,
+                profileImage = user.ProfileImage,
                 hasFaceData = user.FaceData != null && user.FaceData.Any()
             });
         }
