@@ -23,8 +23,27 @@ namespace SmartAttendance.API.Controllers
         [HttpGet]
         public async Task<IActionResult> GetAttendanceRecords([FromQuery] string? search, [FromQuery] string? status, [FromQuery] string? dateRange)
         {
+            var loggedInUserId = User.FindFirst(System.Security.Claims.ClaimTypes.NameIdentifier)?.Value 
+                              ?? User.FindFirst("id")?.Value 
+                              ?? User.FindFirst("sub")?.Value;
+                              
+            var loggedInRole = User.FindFirst(System.Security.Claims.ClaimTypes.Role)?.Value 
+                            ?? User.FindFirst("role")?.Value;
+
             var filterBuilder = Builders<Attendance>.Filter;
             var filter = filterBuilder.Empty;
+
+            if (loggedInRole != "Admin")
+            {
+                if (string.IsNullOrEmpty(loggedInUserId))
+                {
+                    return Unauthorized(new { success = false, message = "Security Exception: Authentic JWT Token does not carry a verifiable NameIdentifier." });
+                }
+                
+                Console.WriteLine($"[DEBUG] GetAttendanceRecords - Extracted JWT userId: {loggedInUserId}");
+                
+                filter &= filterBuilder.Eq(a => a.UserId, loggedInUserId);
+            }
 
             if (!string.IsNullOrEmpty(status) && status != "All Status")
             {
@@ -40,6 +59,15 @@ namespace SmartAttendance.API.Controllers
             }
 
             var records = await _mongoService.Attendances.Find(filter).SortByDescending(a => a.Date).ThenByDescending(a => a.Time).ToListAsync();
+
+            if (loggedInRole != "Admin")
+            {
+                Console.WriteLine($"[DEBUG] GetAttendanceRecords - Found {records.Count} records for user: {loggedInUserId}");
+                if (records.Count == 0)
+                {
+                    Console.WriteLine($"[WARNING] UserId mismatch or no attendance data found for: {loggedInUserId}");
+                }
+            }
 
             // Enrich with usernames in a structured way (ideally via lookup, but manual here for simplicity)
             var userIds = records.Select(r => r.UserId).Where(id => id != null).Distinct().ToList();
@@ -59,6 +87,37 @@ namespace SmartAttendance.API.Controllers
             });
 
             return Ok(enrichedRecords);
+        }
+
+        [HttpGet("my-summary")]
+        public async Task<IActionResult> GetMyAttendanceSummary()
+        {
+            var loggedInUserId = User.FindFirst(System.Security.Claims.ClaimTypes.NameIdentifier)?.Value 
+                              ?? User.FindFirst("id")?.Value 
+                              ?? User.FindFirst("sub")?.Value;
+                              
+            if (string.IsNullOrEmpty(loggedInUserId))
+            {
+                return Unauthorized(new { success = false, message = "Security Exception: Authentic JWT Token does not carry a verifiable NameIdentifier." });
+            }
+
+            Console.WriteLine($"[DEBUG] GetMyAttendanceSummary - Extracted JWT userId: {loggedInUserId}");
+
+            var records = await _mongoService.Attendances
+                .Find(a => a.UserId == loggedInUserId)
+                .ToListAsync();
+
+            Console.WriteLine($"[DEBUG] GetMyAttendanceSummary - Found {records.Count} records in DB for matching UserId.");
+            if (records.Count == 0)
+            {
+                Console.WriteLine($"[WARNING] UserId mismatch or no attendance data found for: {loggedInUserId}");
+            }
+
+            var present = records.Count(a => a.Status == "Present");
+            var late = records.Count(a => a.Status == "Late");
+            var absent = records.Count(a => a.Status == "Absent");
+
+            return Ok(new { present, late, absent });
         }
 
         [HttpPost("mark")]

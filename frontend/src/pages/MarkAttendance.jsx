@@ -126,7 +126,7 @@ const MarkAttendance = () => {
       }
     }
 
-    const threshold = 0.5; // Strictly clamped back to 0.5 for explicit security
+    const threshold = 0.6; // Relaxed matching threshold for variations (glasses, beard, lighting)
     console.log(`[MarkAttendance] Target matched evaluated for: ${targetUser.name} with distance ${minDistance.toFixed(4)}`);
 
     if (minDistance <= threshold) {
@@ -183,84 +183,116 @@ const MarkAttendance = () => {
       return;
     }
 
-    // Initialize Liveness Challenge
     const task = Math.random() > 0.5 ? 'blink' : 'turn';
     setLivenessTask(task);
-    setLivenessStatus(`LIVENESS CHECK: Please ${task === 'blink' ? 'blink your eyes quickly' : 'turn your head slightly left or right'}. (15s timeout)`);
     setLoading(true);
 
-    const startTime = Date.now();
-    let blinkCount = 0;
-    let isLiveVerified = false;
-    let bestDescriptor = null;
+    let attempts = 0;
+    const MAX_ATTEMPTS = 3; // 1 initial + 2 retries
+    let collectedDescriptors = [];
 
-    const detectLiveness = async () => {
-      // 15 seconds timeout
-      if (Date.now() - startTime > 15000) {
-        setLivenessStatus('Fake attempt detected. Timeout exceeded.');
-        setLivenessTask(null);
-        setLoading(false);
-        return;
-      }
+    const runChallenge = () => {
+      const startTime = Date.now();
+      let blinkCount = 0;
+      let isLiveVerified = false;
+      collectedDescriptors = [];
+      setLivenessStatus(`Attempt ${attempts + 1}/${MAX_ATTEMPTS}: Please ${task === 'blink' ? 'blink your eyes quickly' : 'turn your head slightly left or right'}. (25s limit)`);
 
-      if (!webcamRef.current || !webcamRef.current.video) {
-        animationFrameRef.current = setTimeout(detectLiveness, 100);
-        return;
-      }
-
-      const videoEl = webcamRef.current.video;
-      if (videoEl.readyState !== 4) {
-        animationFrameRef.current = setTimeout(detectLiveness, 100);
-        return;
-      }
-
-      try {
-        const options = new faceapi.TinyFaceDetectorOptions({ inputSize: 416, scoreThreshold: 0.5 });
-        const detection = await faceapi.detectSingleFace(videoEl, options)
-          .withFaceLandmarks()
-          .withFaceDescriptor();
-
-        if (detection) {
-          bestDescriptor = Array.from(detection.descriptor);
-          const landmarks = detection.landmarks;
-
-          if (task === 'blink') {
-            const leftEye = landmarks.getLeftEye();
-            const rightEye = landmarks.getRightEye();
-            const leftEAR = getEAR(leftEye);
-            const rightEAR = getEAR(rightEye);
-            const avgEAR = (leftEAR + rightEAR) / 2.0;
-            
-            if (avgEAR < 0.25) { // Blink threshold
-              blinkCount++;
-            } else if (blinkCount > 0) {
-              isLiveVerified = true;
-            }
-          } else if (task === 'turn') {
-            const yaw = getHeadYaw(landmarks);
-            if (yaw > 1.8 || yaw < 0.55) { // Sufficient turn
-              isLiveVerified = true;
-            }
+      const detectLiveness = async () => {
+        const elapsed = Date.now() - startTime;
+        if (elapsed > 25000) {
+          attempts++;
+          if (attempts >= MAX_ATTEMPTS) {
+            setLivenessStatus('Fake attempt detected. Max retries exceeded.');
+            setAiMessage('');
+            setLivenessTask(null);
+            setLoading(false);
+            return;
+          } else {
+            setLivenessStatus(`Timeout. Retrying... (${attempts}/${MAX_ATTEMPTS})`);
+            setTimeout(runChallenge, 2000);
+            return;
           }
         }
-      } catch (err) {
-        console.error("Liveness detection error", err);
-      }
 
-      if (isLiveVerified && bestDescriptor) {
-        setLivenessStatus('Liveness verified! Proceeding to identify...');
-        setLivenessTask(null); // Clear challenge UI
-        await verifyIdentity(targetUser, bestDescriptor);
-      } else {
-        // Continue checking
-        animationFrameRef.current = setTimeout(detectLiveness, 150);
-      }
+        if (!webcamRef.current || !webcamRef.current.video) {
+          animationFrameRef.current = setTimeout(detectLiveness, 100);
+          return;
+        }
+
+        const videoEl = webcamRef.current.video;
+        if (videoEl.readyState !== 4) {
+          animationFrameRef.current = setTimeout(detectLiveness, 100);
+          return;
+        }
+
+        try {
+          const options = new faceapi.TinyFaceDetectorOptions({ inputSize: 512, scoreThreshold: 0.5 });
+          const detection = await faceapi.detectSingleFace(videoEl, options)
+            .withFaceLandmarks()
+            .withFaceDescriptor();
+
+          if (detection) {
+            const score = Math.round(detection.detection.score * 100);
+            setAiMessage(`Face detected! Confidence: ${score}% | Collecting frames: ${collectedDescriptors.length}/15`);
+
+            if (collectedDescriptors.length < 15) {
+              collectedDescriptors.push(detection.descriptor);
+            }
+
+            const landmarks = detection.landmarks;
+
+            if (task === 'blink') {
+              const leftEye = landmarks.getLeftEye();
+              const rightEye = landmarks.getRightEye();
+              const leftEAR = getEAR(leftEye);
+              const rightEAR = getEAR(rightEye);
+              const avgEAR = (leftEAR + rightEAR) / 2.0;
+              
+              if (avgEAR < 0.25) { // Blink threshold
+                blinkCount++;
+              } else if (blinkCount > 0) {
+                isLiveVerified = true;
+              }
+            } else if (task === 'turn') {
+              const yaw = getHeadYaw(landmarks);
+              if (yaw > 1.8 || yaw < 0.55) { // Sufficient turn
+                isLiveVerified = true;
+              }
+            }
+          } else {
+            setAiMessage('Adjust position / lighting. No face clearly detected.');
+          }
+        } catch (err) {
+          console.error("Liveness detection error", err);
+        }
+
+        // Require both liveness verified and at least 10 frames collected
+        if (isLiveVerified && collectedDescriptors.length >= 10) {
+          setLivenessStatus('Liveness verified! Averaging frames to identify...');
+          setLivenessTask(null); 
+          
+          const length = collectedDescriptors[0].length;
+          const averaged = new Float32Array(length).fill(0);
+          for (let i = 0; i < collectedDescriptors.length; i++) {
+            for (let j = 0; j < length; j++) {
+              averaged[j] += collectedDescriptors[i][j];
+            }
+          }
+          for (let j = 0; j < length; j++) {
+            averaged[j] /= collectedDescriptors.length;
+          }
+          
+          await verifyIdentity(targetUser, Array.from(averaged));
+        } else {
+          animationFrameRef.current = setTimeout(detectLiveness, 150);
+        }
+      };
+
+      detectLiveness();
     };
 
-    detectLiveness();
-    
-    // Cleanup function not strictly needed for setTimeout loop if component stays mounted,
-    // but good practice. We clear this timeout inside detectLiveness on success/timeout.
+    runChallenge();
 
   }, [webcamRef, modelsLoaded, registeredFaces, selectedUser, getEAR, getHeadYaw]);
 
@@ -338,78 +370,91 @@ const MarkAttendance = () => {
             </div>
           </div>
 
+          {/* Main Layout Container */}
           <div style={{ 
-            backgroundColor: '#f1f5f9', 
-            borderRadius: '0.5rem', 
-            height: '300px', 
             display: 'flex', 
-            alignItems: 'center', 
-            justifyContent: 'center',
-            marginBottom: '1rem',
-            overflow: 'hidden',
-            position: 'relative'
+            gap: '20px', 
+            alignItems: 'center',
+            flexWrap: 'wrap'
           }}>
-            {cameraActive ? (
-              <>
-                <Webcam
-                  audio={false}
-                  ref={webcamRef}
-                  screenshotFormat="image/jpeg"
-                  videoConstraints={{ width: 1280, height: 720, facingMode: "user" }}
-                  style={{ width: '100%', height: '100%', objectFit: 'cover' }}
-                />
-                {(aiMessage || livenessStatus) && (
-                  <div style={{ 
-                    position: 'absolute', 
-                    bottom: '1rem', 
-                    left: '50%', 
-                    transform: 'translateX(-50%)',
-                    backgroundColor: livenessStatus.includes('Fake') ? 'rgba(220, 38, 38, 0.9)' : (livenessStatus.includes('verified') ? 'rgba(22, 163, 74, 0.9)' : 'rgba(0,0,0,0.85)'),
-                    color: 'white',
-                    padding: '0.75rem 1.25rem',
-                    borderRadius: '0.5rem',
-                    fontSize: '0.875rem',
-                    zIndex: 10,
-                    fontWeight: 500,
-                    border: '1px solid rgba(255,255,255,0.1)',
-                    textAlign: 'center',
-                    minWidth: '250px'
-                  }}>
-                    {livenessStatus ? livenessStatus : aiMessage}
-                  </div>
-                )}
-              </>
-            ) : (
-              <div style={{ textAlign: 'center', color: 'var(--text-muted)' }}>
-                <CameraOff size={48} style={{ margin: '0 auto 0.5rem', opacity: 0.5 }} />
-                <p>Camera is tightly secured</p>
-              </div>
-            )}
-          </div>
+            {/* Camera Section */}
+            <div style={{ 
+              flex: '2 1 300px',
+              backgroundColor: '#f1f5f9', 
+              borderRadius: '12px', 
+              display: 'flex', 
+              alignItems: 'center', 
+              justifyContent: 'center',
+              position: 'relative'
+            }}>
+              {cameraActive ? (
+                <>
+                  <Webcam
+                    audio={false}
+                    ref={webcamRef}
+                    screenshotFormat="image/jpeg"
+                    videoConstraints={{ width: 1280, height: 720, facingMode: "user" }}
+                    style={{ width: '100%', maxHeight: '350px', objectFit: 'contain', borderRadius: '12px' }}
+                  />
+                  {(aiMessage || livenessStatus) && (
+                    <div style={{ 
+                      position: 'absolute', 
+                      bottom: '1rem', 
+                      left: '50%', 
+                      transform: 'translateX(-50%)',
+                      backgroundColor: livenessStatus.includes('Fake') ? 'rgba(220, 38, 38, 0.9)' : (livenessStatus.includes('verified') ? 'rgba(22, 163, 74, 0.9)' : 'rgba(0,0,0,0.85)'),
+                      color: 'white',
+                      padding: '0.75rem 1.25rem',
+                      borderRadius: '0.5rem',
+                      fontSize: '0.875rem',
+                      zIndex: 10,
+                      fontWeight: 500,
+                      border: '1px solid rgba(255,255,255,0.1)',
+                      textAlign: 'center',
+                      minWidth: '250px'
+                    }}>
+                      {livenessStatus ? livenessStatus : aiMessage}
+                    </div>
+                  )}
+                </>
+              ) : (
+                <div style={{ textAlign: 'center', color: 'var(--text-muted)', padding: '4rem 0' }}>
+                  <CameraOff size={48} style={{ margin: '0 auto 0.5rem', opacity: 0.5 }} />
+                  <p>Camera is tightly secured</p>
+                </div>
+              )}
+            </div>
 
-          <div style={{ display: 'flex', gap: '1rem' }}>
-            <button 
-              className="btn btn-primary" 
-              style={{ flex: 1 }}
-              onClick={() => {
-                setCameraActive(!cameraActive);
-                setLivenessStatus('');
-                setLivenessTask(null);
-                if (animationFrameRef.current) clearTimeout(animationFrameRef.current);
-              }}
-              disabled={!modelsLoaded}
-            >
-              <Camera size={18} />
-              {cameraActive ? 'Stop Biometrics' : 'Awake Neural Net'}
-            </button>
-            <button 
-              className="btn btn-secondary" 
-              style={{ flex: 1, backgroundColor: 'var(--success)', color: 'white' }}
-              onClick={capture}
-              disabled={!cameraActive || loading || !modelsLoaded}
-            >
-               Verify Identity Payload
-            </button>
+            {/* Button Section */}
+            <div style={{ 
+              flex: '1 1 200px',
+              display: 'flex', 
+              flexDirection: 'column', 
+              gap: '10px' 
+            }}>
+              <button 
+                className="btn btn-primary" 
+                style={{ width: '100%' }}
+                onClick={() => {
+                  setCameraActive(!cameraActive);
+                  setLivenessStatus('');
+                  setLivenessTask(null);
+                  if (animationFrameRef.current) clearTimeout(animationFrameRef.current);
+                }}
+                disabled={!modelsLoaded}
+              >
+                <Camera size={18} />
+                {cameraActive ? 'Stop Biometrics' : 'Awake Neural Net'}
+              </button>
+              <button 
+                className="btn btn-secondary" 
+                style={{ width: '100%', backgroundColor: 'var(--success)', color: 'white' }}
+                onClick={capture}
+                disabled={!cameraActive || loading || !modelsLoaded}
+              >
+                 Verify Identity Payload
+              </button>
+            </div>
           </div>
         </div>
 
