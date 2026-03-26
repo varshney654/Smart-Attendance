@@ -29,5 +29,11 @@ namespace SmartAttendance.API.Models
 
         [BsonElement("confidence")]
         public double? Confidence { get; set; }
+
+        [BsonElement("latitude")]
+        public double? Latitude { get; set; }
+
+        [BsonElement("longitude")]
+        public double? Longitude { get; set; }
     }
 }

@@ -216,6 +216,21 @@ const ManageUsers = () => {
         </div>
       </div>
 
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '1.5rem', marginTop: '2rem' }}>
+        <div className="card glass animate-fade-in" style={{ padding: '1.5rem', borderLeft: '4px solid var(--primary)' }}>
+          <p style={{ color: 'var(--text-muted)', fontSize: '0.875rem', marginBottom: '0.5rem' }}>Total Users</p>
+          <h2 style={{ fontSize: '2rem', margin: 0 }}>{users.length}</h2>
+        </div>
+        <div className="card glass animate-fade-in" style={{ padding: '1.5rem', borderLeft: '4px solid var(--success)', animationDelay: '0.1s' }}>
+          <p style={{ color: 'var(--text-muted)', fontSize: '0.875rem', marginBottom: '0.5rem', fontWeight: 500 }}>Students</p>
+          <h2 style={{ fontSize: '2rem', margin: 0, color: 'var(--success)' }}>{users.filter(u => u.role === 'Student').length}</h2>
+        </div>
+        <div className="card glass animate-fade-in" style={{ padding: '1.5rem', borderLeft: '4px solid var(--warning)', animationDelay: '0.2s' }}>
+          <p style={{ color: 'var(--text-muted)', fontSize: '0.875rem', marginBottom: '0.5rem', fontWeight: 500 }}>Employees</p>
+          <h2 style={{ fontSize: '2rem', margin: 0, color: 'var(--warning)' }}>{users.filter(u => u.role === 'Employee').length}</h2>
+        </div>
+      </div>
+
       {/* User Form Modal */}
       {showModal && (
         <div style={{

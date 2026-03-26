@@ -31,15 +31,17 @@ const Sidebar = () => {
 
   return (
     <aside style={{
-      width: '260px',
+      width: '240px',
       backgroundColor: 'var(--surface)',
       borderRight: '1px solid var(--border)',
+      boxShadow: 'var(--shadow-sm)',
       display: 'flex',
       flexDirection: 'column',
       padding: '1.5rem',
       position: 'sticky',
       top: 0,
-      height: '100vh'
+      height: '100vh',
+      zIndex: 10
     }}>
       <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', marginBottom: '2.5rem' }}>
         <div style={{
@@ -71,9 +73,10 @@ const Sidebar = () => {
               padding: '0.75rem 1rem',
               borderRadius: '0.5rem',
               color: isActive ? 'var(--primary)' : 'var(--text-main)',
-              backgroundColor: isActive ? 'rgba(99, 102, 241, 0.1)' : 'transparent',
+              backgroundColor: isActive ? 'rgba(99, 102, 241, 0.08)' : 'transparent',
               fontWeight: isActive ? 600 : 500,
-              transition: 'all 0.2s',
+              boxShadow: isActive ? 'inset 3px 0 0 0 var(--primary)' : 'none',
+              transition: 'all 0.2s ease-in-out',
             })}
           >
             {link.icon}

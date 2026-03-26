@@ -7,5 +7,7 @@ namespace SmartAttendance.API.DTOs
         public double? Confidence { get; set; }
         public List<double>? FaceDescriptor { get; set; }
         public bool IsLive { get; set; } = false;
+        public double? Latitude { get; set; }
+        public double? Longitude { get; set; }
     }
 }

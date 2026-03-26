@@ -83,7 +83,9 @@ namespace SmartAttendance.API.Controllers
                 r.Time,
                 r.Status,
                 r.Method,
-                r.Confidence
+                r.Confidence,
+                r.Latitude,
+                r.Longitude
             });
 
             return Ok(enrichedRecords);
@@ -125,8 +127,11 @@ namespace SmartAttendance.API.Controllers
         {
             try
             {
-                var loggedInUserId = User.FindFirst(System.Security.Claims.ClaimTypes.NameIdentifier)?.Value;
-                var loggedInRole = User.FindFirst(System.Security.Claims.ClaimTypes.Role)?.Value;
+                var loggedInUserId = User.FindFirst(System.Security.Claims.ClaimTypes.NameIdentifier)?.Value 
+                                  ?? User.FindFirst("id")?.Value 
+                                  ?? User.FindFirst("sub")?.Value;
+                var loggedInRole = User.FindFirst(System.Security.Claims.ClaimTypes.Role)?.Value 
+                                ?? User.FindFirst("role")?.Value;
 
                 if (loggedInRole != "Admin")
                 {
@@ -197,7 +202,9 @@ namespace SmartAttendance.API.Controllers
                     Date = today,
                     Time = currentTime.ToString("HH:mm:ss"),
                     Method = dto.Method,
-                    Confidence = dto.Confidence
+                    Confidence = dto.Confidence,
+                    Latitude = dto.Latitude,
+                    Longitude = dto.Longitude
                 };
                 
                 if (currentTime.TimeOfDay <= thresholdTime)
@@ -223,6 +230,22 @@ namespace SmartAttendance.API.Controllers
                 _logger.LogError(ex, "A critical error occurred while attempting to mathematically map and log the attendance vector into MongoDB.");
                 return StatusCode(500, new { success = false, message = "Failed due to server error" });
             }
+        }
+
+        private double CalculateHaversineDistance(double lat1, double lon1, double lat2, double lon2)
+        {
+            var r = 6371e3; // Earth's radius in meters
+            var t1 = lat1 * Math.PI / 180;
+            var t2 = lat2 * Math.PI / 180;
+            var dt = (lat2 - lat1) * Math.PI / 180;
+            var dl = (lon2 - lon1) * Math.PI / 180;
+
+            var a = Math.Sin(dt / 2) * Math.Sin(dt / 2) +
+                    Math.Cos(t1) * Math.Cos(t2) *
+                    Math.Sin(dl / 2) * Math.Sin(dl / 2);
+            var c = 2 * Math.Atan2(Math.Sqrt(a), Math.Sqrt(1 - a));
+
+            return r * c; // Distance in meters
         }
 
         private double EuclideanDistance(double[] source, List<double> target)
