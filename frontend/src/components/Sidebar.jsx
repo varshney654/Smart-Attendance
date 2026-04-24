@@ -26,19 +26,22 @@ const Sidebar = () => {
 
   if (user?.role === 'Admin') {
     links.splice(4, 0, { to: '/users', label: 'Manage Users', icon: <Users size={20} /> });
+    links.splice(5, 0, { to: '/register-face', label: 'Register Face', icon: <Camera size={20} /> });
   }
 
   return (
     <aside style={{
-      width: '260px',
+      width: '240px',
       backgroundColor: 'var(--surface)',
       borderRight: '1px solid var(--border)',
+      boxShadow: 'var(--shadow-sm)',
       display: 'flex',
       flexDirection: 'column',
       padding: '1.5rem',
       position: 'sticky',
       top: 0,
-      height: '100vh'
+      height: '100vh',
+      zIndex: 10
     }}>
       <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', marginBottom: '2.5rem' }}>
         <div style={{
@@ -70,9 +73,10 @@ const Sidebar = () => {
               padding: '0.75rem 1rem',
               borderRadius: '0.5rem',
               color: isActive ? 'var(--primary)' : 'var(--text-main)',
-              backgroundColor: isActive ? 'rgba(99, 102, 241, 0.1)' : 'transparent',
+              backgroundColor: isActive ? 'rgba(99, 102, 241, 0.08)' : 'transparent',
               fontWeight: isActive ? 600 : 500,
-              transition: 'all 0.2s',
+              boxShadow: isActive ? 'inset 3px 0 0 0 var(--primary)' : 'none',
+              transition: 'all 0.2s ease-in-out',
             })}
           >
             {link.icon}
@@ -83,9 +87,13 @@ const Sidebar = () => {
 
       <div style={{ marginTop: 'auto', paddingTop: '1.5rem', borderTop: '1px solid var(--border)' }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', marginBottom: '1rem' }}>
-          <div style={{ width: '40px', height: '40px', borderRadius: '50%', backgroundColor: 'var(--primary)', color: 'white', display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: 'bold' }}>
-            {user?.name?.charAt(0) || 'U'}
-          </div>
+          {user?.profileImage ? (
+            <img src={user.profileImage} alt="Profile" style={{ width: '40px', height: '40px', borderRadius: '50%', objectFit: 'cover', border: '2px solid var(--border)' }} />
+          ) : (
+            <div style={{ width: '40px', height: '40px', borderRadius: '50%', backgroundColor: 'var(--primary)', color: 'white', display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: 'bold' }}>
+              {user?.name?.charAt(0) || 'U'}
+            </div>
+          )}
           <div>
             <p style={{ margin: 0, fontWeight: 500, fontSize: '0.875rem' }}>{user?.name}</p>
             <p style={{ margin: 0, fontSize: '0.75rem', color: 'var(--text-muted)' }}>{user?.role}</p>

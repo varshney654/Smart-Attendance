@@ -23,6 +23,7 @@ builder.Services.Configure<DatabaseSettings>(
     builder.Configuration.GetSection("SmartAttendanceDatabase"));
 
 builder.Services.AddSingleton<MongoDbService>();
+builder.Services.AddHostedService<AutoAbsentService>();
 
 // Register Prisma-like ORM Context
 builder.Services.AddSingleton<PrismaDbContext>(sp =>

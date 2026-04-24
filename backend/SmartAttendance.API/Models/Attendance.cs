@@ -4,6 +4,7 @@ using MongoDB.Bson.Serialization.Attributes;
 
 namespace SmartAttendance.API.Models
 {
+    [BsonIgnoreExtraElements]
     public class Attendance
     {
         [BsonId]
@@ -26,7 +27,16 @@ namespace SmartAttendance.API.Models
         [BsonElement("method")]
         public string Method { get; set; } = "Manual"; // AI, Manual
 
+        [BsonElement("role")]
+        public string? Role { get; set; } // Student, Staff, Admin
+
         [BsonElement("confidence")]
         public double? Confidence { get; set; }
+
+        [BsonElement("latitude")]
+        public double? Latitude { get; set; }
+
+        [BsonElement("longitude")]
+        public double? Longitude { get; set; }
     }
 }

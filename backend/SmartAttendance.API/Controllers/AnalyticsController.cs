@@ -18,6 +18,7 @@ namespace SmartAttendance.API.Controllers
         }
 
         [HttpGet("dashboard")]
+        [Authorize(Roles = "Admin")]
         public async Task<IActionResult> GetDashboardMetrics()
         {
             var today = DateTime.UtcNow.Date;

@@ -1,17 +1,26 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useContext } from 'react';
 import api from '../utils/api';
-import { Users, UserCheck, UserX, TrendingUp } from 'lucide-react';
+import { AuthContext } from '../context/AuthContext';
+import { Users, UserCheck, UserX, TrendingUp, Clock, History } from 'lucide-react';
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip as RechartsTooltip, ResponsiveContainer, PieChart, Pie, Cell } from 'recharts';
 
 const COLORS = ['#10b981', '#f59e0b', '#ef4444']; // Present, Late, Absent
 
 const Dashboard = () => {
+  const { user } = useContext(AuthContext);
+  const isAdmin = user?.role === 'Admin';
+  
   const [data, setData] = useState(null);
+  const [personalRecords, setPersonalRecords] = useState([]);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    fetchDashboardData();
-  }, []);
+    if (isAdmin) {
+      fetchDashboardData();
+    } else {
+      fetchPersonalData();
+    }
+  }, [isAdmin]);
 
   const fetchDashboardData = async () => {
     try {
@@ -24,8 +33,133 @@ const Dashboard = () => {
     }
   };
 
+  const [personalSummary, setPersonalSummary] = useState({ present: 0, late: 0, absent: 0 });
+
+  const fetchPersonalData = async () => {
+    try {
+      const [historyRes, summaryRes] = await Promise.all([
+        api.get('/attendance'),
+        api.get('/attendance/my-summary')
+      ]);
+      setPersonalRecords(historyRes.data);
+      setPersonalSummary(summaryRes.data);
+    } catch (error) {
+      console.error('Failed to fetch personal attendance data', error);
+    } finally {
+      setLoading(false);
+    }
+  };
+
   if (loading) return <div>Loading...</div>;
-  if (!data) return <div>Failed to load data</div>;
+  if (isAdmin && !data) return <div>Failed to load data</div>;
+
+  const renderWelcomeHeader = () => (
+    <div style={{ display: 'flex', alignItems: 'center', gap: '1.5rem', marginBottom: '2rem' }}>
+      {user?.profileImage ? (
+        <img src={user.profileImage} alt={user.name} style={{ width: '64px', height: '64px', borderRadius: '50%', objectFit: 'cover', border: '3px solid white', boxShadow: 'var(--shadow-md)' }} />
+      ) : (
+        <div style={{ width: '64px', height: '64px', borderRadius: '50%', backgroundColor: 'var(--primary)', color: 'white', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '1.5rem', fontWeight: 'bold', border: '3px solid white', boxShadow: 'var(--shadow-md)' }}>
+          {user?.name?.charAt(0) || 'U'}
+        </div>
+      )}
+      <div>
+        <h1 style={{ fontSize: '1.875rem', marginBottom: '0.25rem' }}>Welcome back, {user?.name}</h1>
+        <p style={{ color: 'var(--text-muted)', margin: 0 }}>
+          {isAdmin ? 'Real-time attendance monitoring and analytics' : 'Your personal attendance summary'}
+        </p>
+      </div>
+    </div>
+  );
+
+  if (!isAdmin) {
+    const presentCount = personalSummary.present;
+    const lateCount = personalSummary.late;
+    const absentCount = personalSummary.absent;
+
+    return (
+      <div>
+        {renderWelcomeHeader()}
+        
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(240px, 1fr))', gap: '1.5rem', marginBottom: '2rem' }}>
+          <div className="card glass animate-fade-in" style={{ animationDelay: '0.1s' }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
+              <div>
+                <p style={{ color: 'var(--text-muted)', fontSize: '0.875rem', marginBottom: '0.5rem' }}>Total Present</p>
+                <h2 style={{ fontSize: '2rem', margin: 0 }}>{presentCount}</h2>
+              </div>
+              <div style={{ backgroundColor: 'rgba(16, 185, 129, 0.1)', color: 'var(--success)', padding: '0.75rem', borderRadius: '0.5rem' }}>
+                <UserCheck size={24} />
+              </div>
+            </div>
+          </div>
+          <div className="card glass animate-fade-in" style={{ animationDelay: '0.2s' }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
+              <div>
+                <p style={{ color: 'var(--text-muted)', fontSize: '0.875rem', marginBottom: '0.5rem' }}>Total Late</p>
+                <h2 style={{ fontSize: '2rem', margin: 0 }}>{lateCount}</h2>
+              </div>
+              <div style={{ backgroundColor: 'rgba(245, 158, 11, 0.1)', color: 'var(--warning)', padding: '0.75rem', borderRadius: '0.5rem' }}>
+                <Clock size={24} />
+              </div>
+            </div>
+          </div>
+          <div className="card glass animate-fade-in" style={{ animationDelay: '0.3s' }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
+              <div>
+                <p style={{ color: 'var(--text-muted)', fontSize: '0.875rem', marginBottom: '0.5rem' }}>Total Absent</p>
+                <h2 style={{ fontSize: '2rem', margin: 0 }}>{absentCount}</h2>
+              </div>
+              <div style={{ backgroundColor: 'rgba(239, 68, 68, 0.1)', color: 'var(--danger)', padding: '0.75rem', borderRadius: '0.5rem' }}>
+                <UserX size={24} />
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <div className="card glass animate-fade-in" style={{ animationDelay: '0.4s', padding: '1.5rem' }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', marginBottom: '1.5rem' }}>
+            <div style={{ backgroundColor: 'rgba(99, 102, 241, 0.1)', color: 'var(--primary)', padding: '0.5rem', borderRadius: '0.5rem' }}>
+              <History size={20} />
+            </div>
+            <h3 style={{ fontSize: '1.125rem', margin: 0 }}>Personal Attendance History</h3>
+          </div>
+          
+          <div style={{ overflowX: 'auto' }}>
+            <table style={{ width: '100%', borderCollapse: 'collapse', textAlign: 'left' }}>
+              <thead>
+                <tr style={{ borderBottom: '1px solid var(--border)' }}>
+                  <th style={{ padding: '1rem', color: 'var(--text-muted)', fontWeight: 500 }}>Date</th>
+                  <th style={{ padding: '1rem', color: 'var(--text-muted)', fontWeight: 500 }}>Time</th>
+                  <th style={{ padding: '1rem', color: 'var(--text-muted)', fontWeight: 500 }}>Status</th>
+                  <th style={{ padding: '1rem', color: 'var(--text-muted)', fontWeight: 500 }}>Method</th>
+                </tr>
+              </thead>
+              <tbody>
+                {personalRecords.length > 0 ? personalRecords.map((record) => (
+                  <tr key={record.id} style={{ borderBottom: '1px solid var(--border)' }}>
+                    <td style={{ padding: '1rem' }}>{new Date(record.date).toLocaleDateString()}</td>
+                    <td style={{ padding: '1rem' }}>{record.time || '-'}</td>
+                    <td style={{ padding: '1rem' }}>
+                      <span className={`status-badge status-${record.status.toLowerCase()}`}>
+                        {record.status}
+                      </span>
+                    </td>
+                    <td style={{ padding: '1rem' }}>{record.method}</td>
+                  </tr>
+                )) : (
+                  <tr>
+                    <td colSpan="4" style={{ padding: '1rem', textAlign: 'center', color: 'var(--text-muted)' }}>
+                      No attendance records found.
+                    </td>
+                  </tr>
+                )}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+    );
+  }
 
   const pieData = [
     { name: 'Present', value: data.statusDistribution.present },
@@ -35,10 +169,7 @@ const Dashboard = () => {
 
   return (
     <div>
-      <div style={{ marginBottom: '2rem' }}>
-        <h1 style={{ fontSize: '1.875rem', marginBottom: '0.5rem' }}>Dashboard Overview</h1>
-        <p style={{ color: 'var(--text-muted)' }}>Real-time attendance monitoring and analytics</p>
-      </div>
+      {renderWelcomeHeader()}
 
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(240px, 1fr))', gap: '1.5rem', marginBottom: '2rem' }}>
         <div className="card glass animate-fade-in" style={{ animationDelay: '0.1s' }}>

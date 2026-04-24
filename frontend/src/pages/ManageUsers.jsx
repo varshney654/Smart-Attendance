@@ -1,13 +1,20 @@
 import React, { useState, useEffect } from 'react';
 import api from '../utils/api';
-import { Pencil, Trash2, UserPlus, Search } from 'lucide-react';
+import { Pencil, Trash2, UserPlus, Search, Camera, Check, X } from 'lucide-react';
+import FaceRegistrationModal from '../components/FaceRegistrationModal';
 
 const ManageUsers = () => {
   const [users, setUsers] = useState([]);
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState('');
+  
+  // User Form Modal State
   const [showModal, setShowModal] = useState(false);
   const [currentUser, setCurrentUser] = useState(null);
+  
+  // Face Registration Modal State
+  const [showFaceModal, setShowFaceModal] = useState(false);
+  const [faceUser, setFaceUser] = useState(null); // { id, name }
   
   // Form State
   const [name, setName] = useState('');
@@ -15,6 +22,7 @@ const ManageUsers = () => {
   const [password, setPassword] = useState('');
   const [role, setRole] = useState('Student');
   const [department, setDepartment] = useState('');
+  const [profileImage, setProfileImage] = useState('');
 
   useEffect(() => {
     fetchUsers();
@@ -45,6 +53,7 @@ const ManageUsers = () => {
     setPassword('');
     setRole('Student');
     setDepartment('');
+    setProfileImage('');
     setShowModal(true);
   };
 
@@ -55,7 +64,13 @@ const ManageUsers = () => {
     setPassword(''); // leave blank info to indicate keep same
     setRole(user.role);
     setDepartment(user.department || '');
+    setProfileImage(user.profileImage || '');
     setShowModal(true);
+  };
+
+  const openFaceModal = (user) => {
+    setFaceUser({ id: user.id, name: user.name });
+    setShowFaceModal(true);
   };
 
   const handleDelete = async (id) => {
@@ -74,15 +89,21 @@ const ManageUsers = () => {
     try {
       if (currentUser) {
         // Update
-        const payload = { name, email, role, department };
+        const payload = { name, email, role, department, profileImage };
         if (password) payload.password = password;
         await api.put(`/users/${currentUser.id}`, payload);
+        setShowModal(false);
+        fetchUsers();
       } else {
-        // Create (usually uses register, but we have a POST /users if we hooked it up to create directly)
-        await api.post('/auth/register', { name, email, password, role, department });
+        // Create User using POST /users to get full User object with id back
+        const res = await api.post('/users', { name, email, password, role, department, profileImage });
+        setShowModal(false);
+        fetchUsers();
+        
+        // Step 1: Automatically trigger Face Registration Modal for newly created user
+        setFaceUser({ id: res.data.id, name: res.data.name });
+        setShowFaceModal(true);
       }
-      setShowModal(false);
-      fetchUsers();
     } catch (err) {
       alert(err.response?.data?.message || 'Action failed');
     }
@@ -128,22 +149,27 @@ const ManageUsers = () => {
                 <th>Email</th>
                 <th>Role</th>
                 <th>Department</th>
+                <th>Face Status</th>
                 <th style={{ textAlign: 'right' }}>Actions</th>
               </tr>
             </thead>
             <tbody>
               {loading ? (
-                <tr><td colSpan="5" style={{ textAlign: 'center', padding: '2rem' }}>Loading users...</td></tr>
+                <tr><td colSpan="6" style={{ textAlign: 'center', padding: '2rem' }}>Loading users...</td></tr>
               ) : filteredUsers.length === 0 ? (
-                <tr><td colSpan="5" style={{ textAlign: 'center', padding: '2rem' }}>No users found</td></tr>
+                <tr><td colSpan="6" style={{ textAlign: 'center', padding: '2rem' }}>No users found</td></tr>
               ) : (
                 filteredUsers.map(user => (
                   <tr key={user.id}>
                     <td>
                       <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
-                        <div style={{ width: '32px', height: '32px', borderRadius: '50%', backgroundColor: 'var(--primary)', color: 'white', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '0.875rem', fontWeight: 600 }}>
-                          {user.name.charAt(0)}
-                        </div>
+                        {user.profileImage ? (
+                          <img src={user.profileImage} alt={user.name} style={{ width: '32px', height: '32px', borderRadius: '50%', objectFit: 'cover', border: '1px solid var(--border)' }} />
+                        ) : (
+                          <div style={{ width: '32px', height: '32px', borderRadius: '50%', backgroundColor: 'var(--primary)', color: 'white', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '0.875rem', fontWeight: 600 }}>
+                            {user.name.charAt(0)}
+                          </div>
+                        )}
                         <span style={{ fontWeight: 500 }}>{user.name}</span>
                       </div>
                     </td>
@@ -154,12 +180,30 @@ const ManageUsers = () => {
                       </span>
                     </td>
                     <td style={{ color: 'var(--text-muted)' }}>{user.department || '-'}</td>
+                    <td>
+                      {user.hasFaceData ? (
+                        <span style={{ display: 'flex', alignItems: 'center', gap: '0.25rem', color: 'var(--success)', fontSize: '0.875rem', fontWeight: 500 }}>
+                          <Check size={16} /> Registered
+                        </span>
+                      ) : (
+                        <span style={{ display: 'flex', alignItems: 'center', gap: '0.25rem', color: 'var(--text-muted)', fontSize: '0.875rem', fontWeight: 500 }}>
+                          <X size={16} /> Not Registered
+                        </span>
+                      )}
+                    </td>
                     <td style={{ textAlign: 'right' }}>
                       <div style={{ display: 'flex', gap: '0.5rem', justifyContent: 'flex-end' }}>
-                        <button style={{ color: 'var(--primary)', padding: '0.5rem' }} onClick={() => openEditModal(user)} aria-label="Edit user">
+                        <button 
+                          style={{ color: user.hasFaceData ? 'var(--success)' : 'var(--text-muted)', padding: '0.5rem', border: '1px solid var(--border)', borderRadius: '4px', backgroundColor: 'transparent', cursor: 'pointer' }} 
+                          onClick={() => openFaceModal(user)} 
+                          title="Register Face"
+                        >
+                          <Camera size={16} style={{ display: 'block' }} />
+                        </button>
+                        <button style={{ color: 'var(--primary)', padding: '0.5rem', border: 'none', background: 'none', cursor: 'pointer' }} onClick={() => openEditModal(user)} aria-label="Edit user">
                           <Pencil size={18} />
                         </button>
-                        <button style={{ color: 'var(--danger)', padding: '0.5rem' }} onClick={() => handleDelete(user.id)} aria-label="Delete user">
+                        <button style={{ color: 'var(--danger)', padding: '0.5rem', border: 'none', background: 'none', cursor: 'pointer' }} onClick={() => handleDelete(user.id)} aria-label="Delete user">
                           <Trash2 size={18} />
                         </button>
                       </div>
@@ -172,6 +216,22 @@ const ManageUsers = () => {
         </div>
       </div>
 
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '1.5rem', marginTop: '2rem' }}>
+        <div className="card glass animate-fade-in" style={{ padding: '1.5rem', borderLeft: '4px solid var(--primary)' }}>
+          <p style={{ color: 'var(--text-muted)', fontSize: '0.875rem', marginBottom: '0.5rem' }}>Total Users</p>
+          <h2 style={{ fontSize: '2rem', margin: 0 }}>{users.length}</h2>
+        </div>
+        <div className="card glass animate-fade-in" style={{ padding: '1.5rem', borderLeft: '4px solid var(--success)', animationDelay: '0.1s' }}>
+          <p style={{ color: 'var(--text-muted)', fontSize: '0.875rem', marginBottom: '0.5rem', fontWeight: 500 }}>Students</p>
+          <h2 style={{ fontSize: '2rem', margin: 0, color: 'var(--success)' }}>{users.filter(u => u.role === 'Student').length}</h2>
+        </div>
+        <div className="card glass animate-fade-in" style={{ padding: '1.5rem', borderLeft: '4px solid var(--warning)', animationDelay: '0.2s' }}>
+          <p style={{ color: 'var(--text-muted)', fontSize: '0.875rem', marginBottom: '0.5rem', fontWeight: 500 }}>Employees</p>
+          <h2 style={{ fontSize: '2rem', margin: 0, color: 'var(--warning)' }}>{users.filter(u => u.role === 'Employee').length}</h2>
+        </div>
+      </div>
+
+      {/* User Form Modal */}
       {showModal && (
         <div style={{
           position: 'fixed',
@@ -180,7 +240,7 @@ const ManageUsers = () => {
           display: 'flex',
           alignItems: 'center',
           justifyContent: 'center',
-          zIndex: 50,
+          zIndex: 40,
           backdropFilter: 'blur(4px)'
         }}>
           <div className="card animate-fade-in" style={{ width: '100%', maxWidth: '500px', backgroundColor: 'var(--surface)' }}>
@@ -194,6 +254,30 @@ const ManageUsers = () => {
               <div className="input-group">
                 <label className="input-label">Email</label>
                 <input type="email" className="input-field" value={email} onChange={e=>setEmail(e.target.value)} required />
+              </div>
+              <div className="input-group">
+                <label className="input-label">Profile Image <span style={{color:'var(--text-muted)', fontWeight:'normal'}}>(Max 1MB)</span></label>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '1rem' }}>
+                  {profileImage && (
+                    <img src={profileImage} alt="Preview" style={{ width: '40px', height: '40px', borderRadius: '50%', objectFit: 'cover', border: '1px solid var(--border)' }} />
+                  )}
+                  <input type="file" accept="image/*" className="input-field" onChange={(e) => {
+                    const file = e.target.files[0];
+                    if (file) {
+                      if (file.size > 1024 * 1024) {
+                        alert("File size must strictly be less than 1MB.");
+                        e.target.value = null;
+                        return;
+                      }
+                      const reader = new FileReader();
+                      reader.onloadend = () => setProfileImage(reader.result);
+                      reader.readAsDataURL(file);
+                    }
+                  }} style={{ padding: '0.4rem', flex: 1 }} />
+                  {profileImage && (
+                    <button type="button" onClick={() => setProfileImage('')} style={{ color: 'var(--danger)', background: 'none', border: 'none', cursor: 'pointer', fontSize: '0.875rem' }}>Clear</button>
+                  )}
+                </div>
               </div>
               <div className="input-group">
                 <label className="input-label">Password {currentUser && <span style={{color:'var(--text-muted)', fontWeight:'normal'}}>(Leave blank to keep current)</span>}</label>
@@ -221,6 +305,25 @@ const ManageUsers = () => {
             </form>
           </div>
         </div>
+      )}
+
+      {/* Face Registration Modal */}
+      {showFaceModal && faceUser && (
+        <FaceRegistrationModal 
+          userId={faceUser.id}
+          userName={faceUser.name}
+          onClose={() => {
+            setShowFaceModal(false);
+            setFaceUser(null);
+            alert("Face not registered. AI attendance will not work for this user.");
+            fetchUsers();
+          }}
+          onSuccess={() => {
+            setShowFaceModal(false);
+            setFaceUser(null);
+            fetchUsers();
+          }}
+        />
       )}
     </div>
   );

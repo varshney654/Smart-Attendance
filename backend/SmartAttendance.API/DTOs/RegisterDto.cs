@@ -7,5 +7,6 @@ namespace SmartAttendance.API.DTOs
         public string Password { get; set; } = null!;
         public string Role { get; set; } = "Student";
         public string? Department { get; set; }
+        public string? ProfileImage { get; set; }
     }
 }
