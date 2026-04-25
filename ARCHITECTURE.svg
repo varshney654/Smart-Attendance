@@ -1,0 +1,183 @@
+<svg viewBox="0 0 1200 900" xmlns="http://www.w3.org/2000/svg">
+  <defs>
+    <style type="text/css">
+      <![CDATA[
+        .title { font-size: 28px; font-weight: bold; fill: #1f2937; font-family: Arial, sans-serif; }
+        .subtitle { font-size: 14px; fill: #6b7280; font-family: Arial, sans-serif; }
+        .box-title { font-size: 14px; font-weight: bold; fill: #fff; font-family: Arial, sans-serif; }
+        .box-text { font-size: 12px; fill: #fff; font-family: Arial, sans-serif; }
+        .label { font-size: 11px; fill: #374151; font-weight: 500; font-family: Arial, sans-serif; }
+        .endpoint { font-size: 10px; fill: #374151; font-family: Arial, sans-serif; }
+        
+        .frontend-box { fill: #3b82f6; stroke: #1e40af; stroke-width: 2; }
+        .backend-box { fill: #10b981; stroke: #047857; stroke-width: 2; }
+        .database-box { fill: #f59e0b; stroke: #b45309; stroke-width: 2; }
+        .auth-box { fill: #8b5cf6; stroke: #6d28d9; stroke-width: 2; }
+        .arrow { stroke: #374151; stroke-width: 2; fill: none; }
+        .arrow-text { font-size: 10px; fill: #374151; font-family: Arial, sans-serif; }
+      ]]>
+    </style>
+    <marker id="arrowhead" markerWidth="10" markerHeight="10" refX="9" refY="3" orient="auto">
+      <polygon points="0 0, 10 3, 0 6" fill="#374151" />
+    </marker>
+  </defs>
+
+  <!-- Title -->
+  <text x="600" y="40" class="title" text-anchor="middle">Smart Attendance System Architecture</text>
+  <text x="600" y="60" class="subtitle" text-anchor="middle">Real-time Attendance Management with JWT Authentication</text>
+
+  <!-- ====== CLIENT LAYER ====== -->
+  <text x="50" y="100" class="label">CLIENT LAYER</text>
+  <rect x="40" y="120" width="280" height="200" class="frontend-box" rx="5"/>
+  <text x="180" y="145" class="box-title" text-anchor="middle">React Frontend (Vite)</text>
+  <line x1="50" y1="160" x2="310" y2="160" stroke="#fff" stroke-width="1"/>
+  
+  <text x="180" y="185" class="box-text" text-anchor="middle">• User Registration</text>
+  <text x="180" y="205" class="box-text" text-anchor="middle">• User Login</text>
+  <text x="180" y="225" class="box-text" text-anchor="middle">• Attendance Tracking</text>
+  <text x="180" y="245" class="box-text" text-anchor="middle">• Role-based Dashboard</text>
+  <text x="180" y="265" class="box-text" text-anchor="middle">• User Management</text>
+  <text x="180" y="285" class="box-text" text-anchor="middle">• Department Mgmt</text>
+  <text x="180" y="305" class="box-text" text-anchor="middle">Node.js 18+ | Port: 5173</text>
+
+  <!-- ====== API GATEWAY / AUTH LAYER ====== -->
+  <text x="50" y="360" class="label">AUTHENTICATION LAYER</text>
+  <rect x="40" y="380" width="280" height="120" class="auth-box" rx="5"/>
+  <text x="180" y="405" class="box-title" text-anchor="middle">JWT Authentication</text>
+  <line x1="50" y1="420" x2="310" y2="420" stroke="#fff" stroke-width="1"/>
+  
+  <text x="180" y="445" class="box-text" text-anchor="middle">• Token Generation</text>
+  <text x="180" y="465" class="box-text" text-anchor="middle">• Token Validation</text>
+  <text x="180" y="485" class="box-text" text-anchor="middle">Secret: JWT_SECRET</text>
+
+  <!-- ====== BACKEND LAYER ====== -->
+  <text x="450" y="100" class="label">BACKEND LAYER (.NET 8 API)</text>
+  
+  <!-- Auth Service -->
+  <rect x="420" y="120" width="240" height="100" class="backend-box" rx="5"/>
+  <text x="540" y="140" class="box-title" text-anchor="middle">Authentication Service</text>
+  <line x1="430" y1="155" x2="650" y2="155" stroke="#fff" stroke-width="1"/>
+  <text x="540" y="175" class="box-text" text-anchor="middle" font-size="10">POST /api/auth/register</text>
+  <text x="540" y="190" class="box-text" text-anchor="middle" font-size="10">POST /api/auth/login</text>
+
+  <!-- User Service -->
+  <rect x="680" y="120" width="240" height="100" class="backend-box" rx="5"/>
+  <text x="800" y="140" class="box-title" text-anchor="middle">User Service</text>
+  <line x1="690" y1="155" x2="910" y2="155" stroke="#fff" stroke-width="1"/>
+  <text x="800" y="175" class="box-text" text-anchor="middle" font-size="10">GET /api/users</text>
+  <text x="800" y="190" class="box-text" text-anchor="middle" font-size="10">GET/PUT/DELETE /api/users/{id}</text>
+
+  <!-- Attendance Service -->
+  <rect x="940" y="120" width="240" height="100" class="backend-box" rx="5"/>
+  <text x="1060" y="140" class="box-title" text-anchor="middle">Attendance Service</text>
+  <line x1="950" y1="155" x2="1170" y2="155" stroke="#fff" stroke-width="1"/>
+  <text x="1060" y="175" class="box-text" text-anchor="middle" font-size="10">GET /api/attendance</text>
+  <text x="1060" y="190" class="box-text" text-anchor="middle" font-size="10">POST /api/attendance</text>
+
+  <!-- Business Logic Layer -->
+  <rect x="420" y="250" width="760" height="80" class="backend-box" rx="5" opacity="0.7"/>
+  <text x="800" y="270" class="box-title" text-anchor="middle">Business Logic & ORM Layer</text>
+  <line x1="430" y1="285" x2="1170" y2="285" stroke="#fff" stroke-width="1"/>
+  <text x="800" y="305" class="box-text" text-anchor="middle">Role-Based Access Control (Admin, Employee, Student)</text>
+
+  <!-- Backend Server Info -->
+  <rect x="420" y="360" width="760" height="50" class="backend-box" rx="5" opacity="0.8"/>
+  <text x="800" y="380" class="box-text" text-anchor="middle">.NET 8 SDK | Port: 5000 | ASP.NET Core API</text>
+  <text x="800" y="395" class="box-text" text-anchor="middle" font-size="10">Environment: .env Configuration</text>
+
+  <!-- ====== DATABASE LAYER ====== -->
+  <text x="450" y="450" class="label">DATABASE LAYER</text>
+  
+  <!-- MongoDB Atlas / Local -->
+  <rect x="420" y="470" width="340" height="140" class="database-box" rx="5"/>
+  <text x="590" y="495" class="box-title" text-anchor="middle">MongoDB</text>
+  <line x1="430" y1="510" x2="750" y2="510" stroke="#fff" stroke-width="1"/>
+  
+  <text x="590" y="535" class="box-text" text-anchor="middle">Collections:</text>
+  <text x="590" y="555" class="box-text" text-anchor="middle" font-size="10">• Users (name, email, password, role, dept)</text>
+  <text x="590" y="570" class="box-text" text-anchor="middle" font-size="10">• Attendance Records</text>
+  <text x="590" y="585" class="box-text" text-anchor="middle" font-size="10">• Departments</text>
+  <text x="590" y="600" class="box-text" text-anchor="middle" font-size="10">Atlas Cloud or Local (Port: 27017)</text>
+
+  <!-- Connection Info -->
+  <rect x="800" y="470" width="380" height="140" class="database-box" rx="5"/>
+  <text x="990" y="495" class="box-title" text-anchor="middle">Database Configuration</text>
+  <line x1="810" y1="510" x2="1170" y2="510" stroke="#fff" stroke-width="1"/>
+  
+  <text x="990" y="535" class="box-text" text-anchor="middle">Environment Variables (.env):</text>
+  <text x="990" y="555" class="box-text" text-anchor="middle" font-size="10">MONGO_URI (Atlas or Local)</text>
+  <text x="990" y="570" class="box-text" text-anchor="middle" font-size="10">JWT_SECRET (Authentication)</text>
+  <text x="990" y="585" class="box-text" text-anchor="middle" font-size="10">PORT=5000</text>
+  <text x="990" y="600" class="box-text" text-anchor="middle" font-size="10">Database: SmartAttendance</text>
+
+  <!-- ====== DATA FLOW ARROWS ====== -->
+  <!-- React to Auth -->
+  <path d="M 180 320 Q 180 350 180 380" class="arrow" marker-end="url(#arrowhead)"/>
+  <text x="200" y="350" class="arrow-text">Credentials</text>
+
+  <!-- Auth to Backend -->
+  <path d="M 310 420 L 420 420" class="arrow" marker-end="url(#arrowhead)"/>
+  <text x="360" y="410" class="arrow-text">HTTP Requests</text>
+
+  <!-- Backend to Database -->
+  <path d="M 590 440 L 590 470" class="arrow" marker-end="url(#arrowhead)"/>
+  <text x="610" y="455" class="arrow-text">Query/Insert</text>
+
+  <!-- Database back to Backend -->
+  <path d="M 650 470 L 750 430" class="arrow" marker-end="url(#arrowhead)"/>
+  <text x="680" y="445" class="arrow-text">Data Response</text>
+
+  <!-- Backend to Auth -->
+  <path d="M 540 360 L 240 380" class="arrow" marker-end="url(#arrowhead)"/>
+  <text x="380" y="365" class="arrow-text">Validate Token</text>
+
+  <!-- Backend to React -->
+  <path d="M 420 250 L 310 250" class="arrow" marker-end="url(#arrowhead)"/>
+  <text x="360" y="240" class="arrow-text">API Response (JSON)</text>
+
+  <!-- ====== USER ROLES ====== -->
+  <text x="50" y="680" class="label">SUPPORTED USER ROLES</text>
+  
+  <rect x="40" y="700" width="180" height="60" fill="#e8f5e9" stroke="#4caf50" stroke-width="2" rx="3"/>
+  <text x="130" y="722" class="endpoint" text-anchor="middle" font-weight="bold">ADMIN</text>
+  <text x="130" y="738" class="endpoint" text-anchor="middle" font-size="9">Full System Access</text>
+  <text x="130" y="751" class="endpoint" text-anchor="middle" font-size="9">User & Dept Mgmt</text>
+
+  <rect x="260" y="700" width="180" height="60" fill="#e3f2fd" stroke="#2196f3" stroke-width="2" rx="3"/>
+  <text x="350" y="722" class="endpoint" text-anchor="middle" font-weight="bold">EMPLOYEE</text>
+  <text x="350" y="738" class="endpoint" text-anchor="middle" font-size="9">Mark Attendance</text>
+  <text x="350" y="751" class="endpoint" text-anchor="middle" font-size="9">View Records</text>
+
+  <rect x="480" y="700" width="180" height="60" fill="#f3e5f5" stroke="#9c27b0" stroke-width="2" rx="3"/>
+  <text x="570" y="722" class="endpoint" text-anchor="middle" font-weight="bold">STUDENT</text>
+  <text x="570" y="738" class="endpoint" text-anchor="middle" font-size="9">Mark Attendance</text>
+  <text x="570" y="751" class="endpoint" text-anchor="middle" font-size="9">View Attendance</text>
+
+  <!-- ====== KEY FEATURES ====== -->
+  <text x="700" y="680" class="label">KEY FEATURES</text>
+  
+  <g>
+    <rect x="700" y="700" width="480" height="100" fill="#f5f5f5" stroke="#757575" stroke-width="1" rx="3"/>
+    <text x="710" y="720" class="endpoint" font-weight="bold">✓ Real-time User Registration with Password Hashing</text>
+    <text x="710" y="738" class="endpoint" font-weight="bold">✓ JWT-based Secure Authentication</text>
+    <text x="710" y="756" class="endpoint" font-weight="bold">✓ Role-Based Access Control (RBAC)</text>
+    <text x="710" y="774" class="endpoint" font-weight="bold">✓ Department & User Management</text>
+    <text x="710" y="792" class="endpoint" font-weight="bold">✓ Real-time Attendance Tracking</text>
+  </g>
+
+  <!-- ====== TECH STACK LEGEND ====== -->
+  <text x="50" y="820" class="label">TECHNOLOGY STACK</text>
+  
+  <rect x="40" y="835" width="1120" height="50" fill="#f9f9f9" stroke="#ccc" stroke-width="1" rx="3"/>
+  <text x="60" y="855" class="endpoint" font-weight="bold">Frontend:</text>
+  <text x="140" y="855" class="endpoint">React 18+ | Vite | Node.js 18+</text>
+  
+  <text x="60" y="875" class="endpoint" font-weight="bold">Backend:</text>
+  <text x="140" y="875" class="endpoint">.NET 8 | ASP.NET Core | C#</text>
+  
+  <text x="400" y="855" class="endpoint" font-weight="bold">Database:</text>
+  <text x="500" y="855" class="endpoint">MongoDB (Atlas Cloud or Local)</text>
+  
+  <text x="400" y="875" class="endpoint" font-weight="bold">Security:</text>
+  <text x="500" y="875" class="endpoint">JWT Authentication | Password Hashing</text>
+</svg>

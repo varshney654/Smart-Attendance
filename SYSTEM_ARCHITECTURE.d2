@@ -1,0 +1,624 @@
+direction: down
+
+# Enterprise-Grade Smart Attendance System Architecture
+
+System: {
+  label: "Smart Attendance System - Production Architecture"
+  
+  # ============ CLIENT LAYER ============
+  Client_Layer: {
+    label: "1. CLIENT LAYER"
+    
+    Web_Client: {
+      shape: box
+      label: "Web Client
+      React 18 + Vite
+      - Redux Toolkit (State)
+      - Material-UI (Components)
+      - Axios (HTTP)
+      - WebSocket (Real-time)"
+    }
+    
+    Mobile_Client: {
+      shape: box
+      label: "Mobile Client
+      React Native / Flutter
+      - Offline Sync
+      - Location Tracking
+      - Biometric Auth
+      - Push Notifications"
+    }
+    
+    Desktop_Client: {
+      shape: box
+      label: "Desktop Client
+      Electron App
+      - Background Service
+      - Taskbar Integration
+      - System Tray"
+    }
+  }
+  
+  # ============ CDN & STATIC ASSETS ============
+  CDN_Layer: {
+    label: "2. CDN & STATIC ASSETS"
+    
+    CDN: {
+      shape: box
+      label: "CDN (Cloudflare/CloudFront)
+      - Static Assets Cache
+      - Image Optimization
+      - API Response Cache
+      - Global Distribution"
+    }
+  }
+  
+  # ============ API GATEWAY & LOAD BALANCING ============
+  Gateway_Layer: {
+    label: "3. API GATEWAY & LOAD BALANCING"
+    
+    LB: {
+      shape: box
+      label: "Load Balancer (ALB/NLB)
+      - SSL/TLS Termination
+      - Health Checks
+      - Connection Draining
+      - Cross-region Routing"
+    }
+    
+    API_Gateway: {
+      shape: box
+      label: "API Gateway (Kong/AWS)
+      - Rate Limiting (100 req/sec)
+      - Request Validation
+      - API Versioning (v1, v2)
+      - Request Transformation"
+    }
+    
+    WAF: {
+      shape: box
+      label: "Web Application Firewall
+      - DDoS Protection
+      - SQL Injection Prevention
+      - XSS Protection
+      - Bot Detection"
+    }
+  }
+  
+  # ============ AUTHENTICATION & SECURITY ============
+  Auth_Layer: {
+    label: "4. AUTHENTICATION & SECURITY"
+    
+    Auth_Service: {
+      shape: box
+      label: "Authentication Service
+      - JWT Token Generation
+      - OAuth2 Integration
+      - MFA (TOTP, SMS)
+      - Session Management
+      - Token Refresh Flow"
+    }
+    
+    RBAC: {
+      shape: box
+      label: "Authorization (RBAC)
+      - Role: Admin
+      - Role: Manager
+      - Role: Employee
+      - Role: Student
+      - Fine-grained Permissions"
+    }
+    
+    IdP: {
+      shape: box
+      label: "Identity Provider
+      - Azure AD / Okta
+      - SAML 2.0 Support
+      - LDAP Integration
+      - Social Login (Google, Microsoft)"
+    }
+  }
+  
+  # ============ MICROSERVICES LAYER ============
+  Microservices: {
+    label: "5. MICROSERVICES LAYER (.NET 8 + C#)"
+    
+    User_Service: {
+      shape: box
+      label: "User Service
+      POST /users (Create)
+      GET /users/{id} (Read)
+      PUT /users/{id} (Update)
+      DELETE /users/{id} (Delete)
+      GET /users/department/{id} (Filter)"
+    }
+    
+    Attendance_Service: {
+      shape: box
+      label: "Attendance Service
+      POST /attendance/check-in
+      POST /attendance/check-out
+      GET /attendance/user/{id}
+      GET /attendance/report
+      GET /attendance/analytics"
+    }
+    
+    Department_Service: {
+      shape: box
+      label: "Department Service
+      CRUD Operations
+      Hierarchy Management
+      Budget Tracking
+      Reporting Structure"
+    }
+    
+    Notification_Service: {
+      shape: box
+      label: "Notification Service
+      Email Notifications
+      SMS Alerts (Twilio)
+      Push Notifications (FCM)
+      In-app Notifications"
+    }
+    
+    Analytics_Service: {
+      shape: box
+      label: "Analytics Service
+      Real-time Dashboards
+      Trend Analysis
+      Predictive Analytics
+      Batch Processing (Spark)"
+    }
+  }
+  
+  # ============ SERVICE MESH ============
+  Service_Mesh: {
+    label: "6. SERVICE MESH"
+    
+    Istio: {
+      shape: box
+      label: "Istio Service Mesh
+      - Service Discovery
+      - Circuit Breaker
+      - Retry Logic
+      - Service-to-Service TLS
+      - Traffic Management
+      - Canary Deployments"
+    }
+  }
+  
+  # ============ BUSINESS LOGIC LAYER ============
+  Business_Logic: {
+    label: "7. BUSINESS LOGIC & DATA ACCESS LAYER"
+    
+    Domain_Models: {
+      shape: box
+      label: "Domain Models
+      - User Aggregate
+      - Attendance Aggregate
+      - Department Aggregate
+      - Value Objects
+      - Domain Events"
+    }
+    
+    Repository_Pattern: {
+      shape: box
+      label: "Repository Pattern
+      - Generic Repository<T>
+      - Unit of Work Pattern
+      - Specification Pattern
+      - Query Optimization"
+    }
+    
+    Business_Rules: {
+      shape: box
+      label: "Business Rules Engine
+      - Attendance Rules
+      - Holiday Calendar
+      - Leave Policies
+      - Late Mark Rules
+      - Location Validation"
+    }
+    
+    Mapper: {
+      shape: box
+      label: "Mapper (AutoMapper)
+      - DTO Mapping
+      - Data Transformation
+      - Validation"
+    }
+  }
+  
+  # ============ CACHING LAYER ============
+  Caching_Layer: {
+    label: "8. CACHING LAYER"
+    
+    Redis_Primary: {
+      shape: cylinder
+      label: "Redis Primary
+      - Session Cache
+      - User Data Cache
+      - Attendance Records
+      - Authentication Tokens
+      - Rate Limiter State"
+    }
+    
+    Redis_Secondary: {
+      shape: cylinder
+      label: "Redis Secondary (Replica)
+      - Read Replica
+      - High Availability
+      - Automatic Failover"
+    }
+    
+    Cache_Strategy: {
+      shape: box
+      label: "Cache Strategy
+      - TTL: 1 hour
+      - LRU Eviction
+      - Cache Invalidation
+      - Cache Warmup"
+    }
+  }
+  
+  # ============ MESSAGE QUEUE & EVENT-DRIVEN ============
+  Event_Driven: {
+    label: "9. MESSAGE QUEUE & EVENT-DRIVEN ARCHITECTURE"
+    
+    Message_Broker: {
+      shape: box
+      label: "Message Broker (RabbitMQ)
+      - Attendance Events
+      - User Events
+      - Notification Events
+      - Analytics Events
+      - DLQ (Dead Letter Queue)"
+    }
+    
+    Event_Handlers: {
+      shape: box
+      label: "Event Handlers
+      - CheckIn Event Handler
+      - CheckOut Event Handler
+      - Notification Handler
+      - Audit Log Handler
+      - Analytics Handler"
+    }
+    
+    Saga_Pattern: {
+      shape: box
+      label: "Saga Pattern
+      - Distributed Transactions
+      - Compensation Logic
+      - Choreography
+      - Orchestration"
+    }
+  }
+  
+  # ============ DATABASE LAYER ============
+  Database_Layer: {
+    label: "10. DATABASE LAYER"
+    
+    MongoDB_Primary: {
+      shape: cylinder
+      label: "MongoDB Primary
+      - Write Operations
+      - Collections:
+        - Users
+        - Attendance
+        - Departments
+        - Settings"
+    }
+    
+    MongoDB_Replica1: {
+      shape: cylinder
+      label: "MongoDB Replica 1
+      - Read-only
+      - Backup"
+    }
+    
+    MongoDB_Replica2: {
+      shape: cylinder
+      label: "MongoDB Replica 2
+      - Read-only
+      - Disaster Recovery"
+    }
+    
+    Elasticsearch: {
+      shape: cylinder
+      label: "Elasticsearch
+      - Logs Index
+      - Audit Trails
+      - Full-Text Search
+      - Metrics Storage"
+    }
+  }
+  
+  # ============ EXTERNAL INTEGRATIONS ============
+  External_Services: {
+    label: "11. EXTERNAL INTEGRATIONS"
+    
+    Email_Service: {
+      shape: box
+      label: "Email Service (SendGrid)
+      - Transactional Emails
+      - Report Distribution
+      - Notifications
+      - Templates"
+    }
+    
+    SMS_Service: {
+      shape: box
+      label: "SMS Service (Twilio)
+      - OTP Delivery
+      - Alerts
+      - Reminders"
+    }
+    
+    Cloud_Storage: {
+      shape: box
+      label: "Cloud Storage (S3/Blob)
+      - User Photos
+      - Documents
+      - Reports Export
+      - Backups"
+    }
+    
+    Payment_Gateway: {
+      shape: box
+      label: "Payment Gateway (Stripe)
+      - Premium Features
+      - Billing
+      - Invoicing"
+    }
+  }
+  
+  # ============ MONITORING & OBSERVABILITY ============
+  Observability: {
+    label: "12. MONITORING & OBSERVABILITY"
+    
+    Logging: {
+      shape: box
+      label: "Structured Logging
+      - Serilog + Elasticsearch
+      - Request/Response Logs
+      - Error Logs
+      - Audit Logs
+      - Performance Logs"
+    }
+    
+    Metrics: {
+      shape: box
+      label: "Metrics Collection
+      - Prometheus
+      - Custom Metrics
+      - Business Metrics
+      - Infrastructure Metrics"
+    }
+    
+    Tracing: {
+      shape: box
+      label: "Distributed Tracing
+      - Jaeger
+      - Request Flow
+      - Performance Analysis
+      - Bottleneck Detection"
+    }
+    
+    Alerting: {
+      shape: box
+      label: "Alerting (PagerDuty)
+      - CPU > 80%
+      - Memory > 85%
+      - Error Rate > 1%
+      - Response Time > 2s
+      - API Downtime"
+    }
+    
+    Dashboard: {
+      shape: box
+      label: "Dashboard (Grafana)
+      - Real-time Metrics
+      - System Health
+      - Performance Trends
+      - Business Analytics"
+    }
+  }
+  
+  # ============ CONTAINERIZATION ============
+  Containerization: {
+    label: "13. CONTAINERIZATION & ORCHESTRATION"
+    
+    Docker: {
+      shape: box
+      label: "Docker
+      - Multi-stage Builds
+      - Image Registry
+      - Image Scanning
+      - Vulnerability Check"
+    }
+    
+    Kubernetes: {
+      shape: box
+      label: "Kubernetes (EKS/AKS)
+      - Container Orchestration
+      - Auto-scaling (HPA)
+      - Rolling Updates
+      - Self-healing"
+    }
+    
+    Helm: {
+      shape: box
+      label: "Helm Charts
+      - Package Management
+      - Version Control
+      - Environment Config
+      - Release Management"
+    }
+  }
+  
+  # ============ CI/CD & DEPLOYMENT ============
+  CICD_Layer: {
+    label: "14. CI/CD & DEPLOYMENT"
+    
+    Git: {
+      shape: box
+      label: "Git Repository
+      - Feature Branches
+      - Pull Requests
+      - Code Review
+      - Branch Protection"
+    }
+    
+    Pipeline: {
+      shape: box
+      label: "GitHub Actions Pipeline
+      - Trigger on Push
+      - Run Tests (Unit, Integration)
+      - Code Quality (SonarQube)
+      - Build Docker Image
+      - Push to Registry
+      - Deploy to K8s
+      - Run Smoke Tests"
+    }
+    
+    Deployment: {
+      shape: box
+      label: "Deployment Strategies
+      - Blue-Green
+      - Canary
+      - Rolling Update
+      - Feature Flags
+      - GitOps (ArgoCD)"
+    }
+  }
+  
+  # ============ DISASTER RECOVERY ============
+  Disaster_Recovery: {
+    label: "Disaster Recovery & Backup"
+    
+    Backup: {
+      shape: box
+      label: "Backup Strategy
+      - Daily Backups (2 AM)
+      - Incremental Backup
+      - 30-day Retention
+      - Cross-region Replication
+      - Point-in-time Recovery"
+    }
+    
+    DR_Site: {
+      shape: box
+      label: "DR Site (Warm Standby)
+      - Secondary Region
+      - Automated Failover
+      - RTO: 4 hours
+      - RPO: 1 hour
+      - Health Checks"
+    }
+  }
+  
+  # ============ SECURITY & COMPLIANCE ============
+  Security: {
+    label: "Security & Compliance"
+    
+    API_Security: {
+      shape: box
+      label: "API Security
+      - HTTPS/TLS 1.3
+      - API Key Management
+      - OAuth2 Flow
+      - CORS Policy
+      - API Rate Limiting"
+    }
+    
+    Data_Security: {
+      shape: box
+      label: "Data Security
+      - AES-256 Encryption (at rest)
+      - TLS Encryption (in transit)
+      - Field-level Encryption
+      - Tokenization
+      - Data Masking"
+    }
+    
+    Compliance: {
+      shape: box
+      label: "Compliance & Governance
+      - GDPR Compliance
+      - SOC 2 Type II
+      - ISO 27001
+      - Data Privacy
+      - Audit Trails
+      - Consent Management"
+    }
+  }
+  
+  # ============ PERFORMANCE OPTIMIZATION ============
+  Performance: {
+    label: "Performance Optimization"
+    
+    Optimization: {
+      shape: box
+      label: "Optimization Strategies
+      - Database Indexing
+      - Query Optimization
+      - Connection Pooling
+      - Compression (gzip)
+      - CDN for Static Assets
+      - Lazy Loading
+      - Code Splitting"
+    }
+    
+    Targets: {
+      shape: box
+      label: "Performance Targets
+      - P50: < 100ms
+      - P95: < 500ms
+      - P99: < 2s
+      - Availability: 99.95%
+      - Error Rate: < 0.1%
+      - Cache Hit: > 80%"
+    }
+  }
+}
+
+# ============ DATA FLOW ============
+Client_Layer -> CDN_Layer: "Request Static Assets"
+Client_Layer -> Gateway_Layer: "API Requests"
+CDN_Layer -> Gateway_Layer: "Cache Miss"
+Gateway_Layer -> Auth_Layer: "Authenticate Request"
+Auth_Layer -> Microservices: "Forward Authenticated Request"
+Microservices -> Business_Logic: "Execute Business Logic"
+Business_Logic -> Caching_Layer: "Query Cache"
+Caching_Layer -> Database_Layer: "Cache Miss - Query DB"
+Business_Logic -> Event_Driven: "Publish Domain Events"
+Event_Driven -> Notification_Service: "Send Notifications"
+Event_Driven -> Analytics_Service: "Send Analytics Data"
+Database_Layer -> Elasticsearch: "Index Logs & Metrics"
+Observability -> Dashboard: "Visualize Metrics"
+Containerization -> CICD_Layer: "Deploy Containers"
+CICD_Layer -> Kubernetes: "Orchestrate"
+Kubernetes -> Microservices: "Run Services"
+Disaster_Recovery -> Database_Layer: "Backup"
+Security -> API_Security: "Secure APIs"
+Security -> Database_Layer: "Encrypt Data"
+
+# ============ STYLING ============
+Client_Layer.style.fill: #3b82f6
+CDN_Layer.style.fill: #06b6d4
+Gateway_Layer.style.fill: #8b5cf6
+Auth_Layer.style.fill: #d946ef
+Microservices.style.fill: #10b981
+Service_Mesh.style.fill: #14b8a6
+Business_Logic.style.fill: #84cc16
+Caching_Layer.style.fill: #eab308
+Event_Driven.style.fill: #f97316
+Database_Layer.style.fill: #f59e0b
+External_Services.style.fill: #ec4899
+Observability.style.fill: #6366f1
+Containerization.style.fill: #e11d48
+CICD_Layer.style.fill: #0891b2
+Disaster_Recovery.style.fill: #ef4444
+Security.style.fill: #6b7280
+Performance.style.fill: #0d9488
