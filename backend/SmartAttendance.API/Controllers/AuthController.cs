@@ -74,6 +74,9 @@ namespace SmartAttendance.API.Controllers
                 return Unauthorized(new { message = "Role mismatch", status = 401 });
             }
 
+            if (!string.Equals(user.Role, loginDto.Role, StringComparison.OrdinalIgnoreCase))
+                return Unauthorized(new { message = "Invalid role selected for this account" });
+
             var token = GenerateJwtToken(user);
 
             // Do not send password back
