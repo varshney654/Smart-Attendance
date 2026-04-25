@@ -1,0 +1,314 @@
+direction: down
+
+# Production Deployment Architecture
+
+Production_Environment: {
+  label: "Production Environment (Azure/AWS Cloud)"
+  
+  # CDN & Global Distribution
+  Global_Distribution: {
+    label: "Global Distribution"
+    
+    CDN: {
+      shape: box
+      label: "CDN (Cloudflare/CloudFront)
+      - Static Assets
+      - Images & Videos
+      - API Response Caching"
+    }
+    
+    DNS: {
+      shape: box
+      label: "DNS (Route 53/Azure DNS)
+      - Traffic Routing
+      - Health Checks
+      - Geographic Load Balancing"
+    }
+  }
+  
+  # Load Balancing Tier
+  Load_Balancing: {
+    label: "Load Balancing & WAF"
+    
+    WAF: {
+      shape: box
+      label: "Web Application Firewall
+      - DDoS Protection
+      - SQL Injection Prevention
+      - XSS Protection
+      - Rate Limiting"
+    }
+    
+    ALB: {
+      shape: box
+      label: "Application Load Balancer
+      - SSL/TLS Termination
+      - Path-based Routing
+      - Health Checks
+      - Connection Draining"
+    }
+  }
+  
+  # Kubernetes Cluster
+  Kubernetes_Cluster: {
+    label: "Kubernetes Cluster (EKS/AKS)"
+    
+    Ingress_Controller: {
+      shape: box
+      label: "Ingress Controller
+      - Route Management
+      - TLS Certificates
+      - Rate Limiting"
+    }
+    
+    # Namespace: API Services
+    API_Namespace: {
+      label: "Namespace: api"
+      
+      Attendance_Pod_1: {
+        shape: box
+        label: "Pod: attendance-api-1
+        - Container: API
+        - Sidecar: Logging Agent
+        - Sidecar: Metrics Exporter"
+      }
+      
+      Attendance_Pod_2: {
+        shape: box
+        label: "Pod: attendance-api-2"
+      }
+      
+      Attendance_Pod_3: {
+        shape: box
+        label: "Pod: attendance-api-3"
+      }
+      
+      User_Pod: {
+        shape: box
+        label: "Pod: user-service-1"
+      }
+      
+      Department_Pod: {
+        shape: box
+        label: "Pod: department-service-1"
+      }
+      
+      Service_Mesh: {
+        shape: box
+        label: "Service Mesh (Istio)
+        - Traffic Management
+        - Circuit Breaker
+        - Service-to-Service Auth"
+      }
+      
+      API_Namespace_Storage: {
+        shape: cylinder
+        label: "ConfigMaps & Secrets
+        - Database Credentials
+        - API Keys
+        - Feature Flags"
+      }
+    }
+    
+    # Namespace: Data Services
+    Data_Namespace: {
+      label: "Namespace: data"
+      
+      Redis_Pod: {
+        shape: box
+        label: "Pod: redis-cache-1
+        - Container: Redis
+        - StatefulSet"
+      }
+      
+      Redis_Pod_2: {
+        shape: box
+        label: "Pod: redis-cache-2
+        - Replica"
+      }
+      
+      Redis_Sentinel: {
+        shape: box
+        label: "Redis Sentinel
+        - High Availability
+        - Failover"
+      }
+      
+      RabbitMQ_Pod: {
+        shape: box
+        label: "Pod: rabbitmq-broker
+        - Message Queue
+        - 3-node Cluster"
+      }
+    }
+    
+    # Namespace: Observability
+    Observability_Namespace: {
+      label: "Namespace: monitoring"
+      
+      Prometheus: {
+        shape: box
+        label: "Prometheus
+        - Metrics Collection
+        - 15-day Retention"
+      }
+      
+      Grafana: {
+        shape: box
+        label: "Grafana
+        - Dashboards
+        - Visualizations"
+      }
+      
+      ELK_Stack: {
+        shape: box
+        label: "ELK Stack
+        - Elasticsearch
+        - Logstash
+        - Kibana"
+      }
+      
+      Jaeger: {
+        shape: box
+        label: "Jaeger
+        - Distributed Tracing
+        - Request Flow"
+      }
+    }
+    
+    HPA: {
+      shape: box
+      label: "Horizontal Pod Autoscaler
+      - CPU: 70% threshold
+      - Memory: 80% threshold
+      - Min: 3, Max: 10 pods"
+    }
+  }
+  
+  # Data Persistence Tier
+  Data_Persistence: {
+    label: "Data Persistence Layer"
+    
+    MongoDB_Cluster: {
+      shape: cylinder
+      label: "MongoDB Replica Set
+      - Primary (Write)
+      - Secondary 1 (Read)
+      - Secondary 2 (Backup)"
+    }
+    
+    MongoDB_Atlas: {
+      shape: cylinder
+      label: "MongoDB Atlas
+      - Cloud Managed
+      - Automated Backups
+      - Point-in-time Recovery"
+    }
+    
+    Persistent_Volumes: {
+      shape: box
+      label: "Persistent Volumes
+      - EBS / Azure Disk
+      - Snapshots
+      - Encryption"
+    }
+  }
+  
+  # Backup & Disaster Recovery
+  Backup_DR: {
+    label: "Backup & Disaster Recovery"
+    
+    Backup_Service: {
+      shape: box
+      label: "Backup Service
+      - Daily Backups
+      - Incremental
+      - 30-day Retention"
+    }
+    
+    Cloud_Storage: {
+      shape: cylinder
+      label: "Cloud Storage
+      - S3 / Azure Blob
+      - Cross-region
+      - Versioning"
+    }
+    
+    DR_Site: {
+      shape: box
+      label: "DR Site (Standby)
+      - Warm standby
+      - RPO: 1 hour
+      - RTO: 4 hours"
+    }
+  }
+  
+  # Security Layer
+  Security_Hardening: {
+    label: "Security Hardening"
+    
+    Secret_Manager: {
+      shape: box
+      label: "Secret Manager
+      - Vault / AWS Secrets Manager
+      - Encryption Keys
+      - Rotation Policy"
+    }
+    
+    Network_Policies: {
+      shape: box
+      label: "Network Policies
+      - Pod-to-Pod Security
+      - Ingress Rules
+      - Egress Rules"
+    }
+    
+    RBAC: {
+      shape: box
+      label: "RBAC
+      - Service Accounts
+      - Role Bindings
+      - Least Privilege"
+    }
+    
+    Compliance_Monitoring: {
+      shape: box
+      label: "Compliance Monitoring
+      - Audit Logs
+      - GDPR Compliance
+      - SOC 2 Compliance"
+    }
+  }
+}
+
+# Connection Flow
+CDN -> ALB: "Route to Backend"
+DNS -> CDN: "Resolve Domain"
+WAF -> ALB: "Filter Traffic"
+ALB -> Ingress_Controller: "Forward Requests"
+Ingress_Controller -> API_Namespace: "Route API Calls"
+Ingress_Controller -> Data_Namespace: "Route Data Calls"
+
+API_Namespace -> Data_Namespace: "Query Cache & Queue"
+API_Namespace -> Data_Persistence: "Persist Data"
+Data_Namespace -> Data_Persistence: "Manage State"
+
+Data_Persistence -> Backup_DR: "Replicate"
+Backup_DR -> Cloud_Storage: "Archive"
+
+API_Namespace -> Observability_Namespace: "Send Metrics & Logs"
+Data_Namespace -> Observability_Namespace: "Monitor Health"
+
+Security_Hardening -> API_Namespace: "Enforce Policies"
+Security_Hardening -> Data_Persistence: "Protect Data"
+
+# Color Scheme
+Global_Distribution.style.fill: #3b82f6
+Load_Balancing.style.fill: #8b5cf6
+Kubernetes_Cluster.style.fill: #10b981
+Data_Persistence.style.fill: #f59e0b
+Backup_DR.style.fill: #ef4444
+Security_Hardening.style.fill: #d946ef
+API_Namespace.style.fill: #06b6d4
+Data_Namespace.style.fill: #14b8a6
+Observability_Namespace.style.fill: #6366f1
