@@ -183,6 +183,38 @@ namespace SmartAttendance.API.Controllers
             return Ok(new { message = "Password has been successfully updated!" });
         }
 
+        [HttpPost("/api/request-access")]
+        public IActionResult RequestAccess([FromBody] RequestAccessDto request)
+        {
+            try
+            {
+                Console.WriteLine($"[SMTP] Request Access from {request.Email}");
+                using var smtpClient = new System.Net.Mail.SmtpClient("smtp.gmail.com", 587)
+                {
+                    EnableSsl = true,
+                    UseDefaultCredentials = false,
+                    Credentials = new System.Net.NetworkCredential("smartattendance63@gmail.com", "coms wezm orhg pzbt")
+                };
+
+                var mailMessage = new System.Net.Mail.MailMessage
+                {
+                    From = new System.Net.Mail.MailAddress("smartattendance63@gmail.com", "Smart Attendance System"),
+                    Subject = "New Access Request",
+                    Body = $"<p>A new user has requested access to the system:</p><ul><li><strong>Name:</strong> {request.Name}</li><li><strong>Email:</strong> {request.Email}</li><li><strong>Role:</strong> {request.Role}</li></ul>",
+                    IsBodyHtml = true
+                };
+                mailMessage.To.Add("smartattendance63@gmail.com");
+
+                smtpClient.Send(mailMessage);
+                return Ok(new { success = true, message = "Request submitted successfully" });
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine($"[SMTP ERROR] {ex.Message}");
+                return StatusCode(500, new { success = false, message = "Failed to submit request." });
+            }
+        }
+
         private string GenerateJwtToken(User user)
         {
             var jwtSecret = Environment.GetEnvironmentVariable("JWT_SECRET") ?? "FallbackSecretKey123!@#_MakeItLongEnough";

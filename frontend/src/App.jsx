@@ -12,6 +12,7 @@ import ManageUsers from './pages/ManageUsers';
 import Reports from './pages/Reports';
 import Alerts from './pages/Alerts';
 import RegisterFace from './pages/RegisterFace';
+import RequestAccess from './pages/RequestAccess';
 
 const ProtectedRoute = ({ children, roles }) => {
   const { user } = useContext(AuthContext);
@@ -34,6 +35,7 @@ function App() {
     <Routes>
       <Route path="/login" element={user ? <Navigate to="/" /> : <Login />} />
       <Route path="/forgot-password" element={user ? <Navigate to="/" /> : <ForgotPassword />} />
+      <Route path="/request-access" element={user ? <Navigate to="/" /> : <RequestAccess />} />
       
       <Route path="/" element={
         <ProtectedRoute>

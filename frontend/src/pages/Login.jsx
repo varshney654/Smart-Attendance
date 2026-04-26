@@ -250,6 +250,15 @@ const Login = () => {
             {loading ? 'Authenticating...' : 'Sign In To Proceed'}
           </button>
         </form>
+
+        <div style={{ textAlign: 'center', marginTop: '1.5rem', paddingTop: '1.5rem', borderTop: '1px solid var(--border)' }}>
+          <span style={{ color: 'var(--text-muted)', fontSize: '0.875rem' }}>
+            Need an account?{' '}
+            <Link to="/request-access" style={{ color: 'var(--primary)', textDecoration: 'none', fontWeight: 500 }}>
+              Request Access
+            </Link>
+          </span>
+        </div>
       </div>
     </div>
   );
