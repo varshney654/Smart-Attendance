@@ -1,10 +1,9 @@
 import axios from 'axios';
 
 // Use environment variable for API base URL
-// In development: VITE_API_URL=http://localhost:5000
-// In production: Set your Render backend URL
+// VITE_API_URL MUST be set in both local .env and Render dashboard!
 const api = axios.create({
-  baseURL: import.meta.env.VITE_API_URL || 'http://localhost:5000/api',
+  baseURL: import.meta.env.VITE_API_URL,
   headers: {
     'Content-Type': 'application/json',
   },
