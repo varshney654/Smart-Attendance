@@ -61,13 +61,13 @@ builder.Services.AddControllers();
 builder.Services.AddEndpointsApiExplorer();
 builder.Services.AddSwaggerGen();
 
-// CORS
+// CORS - allow only the deployed frontend origin
 builder.Services.AddCors(options =>
 {
-    options.AddPolicy("AllowAll",
+    options.AddPolicy("AllowSpecific",
         builder =>
         {
-            builder.AllowAnyOrigin()
+            builder.WithOrigins("https://smart-attendance-2-jimq.onrender.com")
                    .AllowAnyMethod()
                    .AllowAnyHeader();
         });
@@ -85,7 +85,7 @@ if (enableSwagger)
     app.UseSwaggerUI();
 }
 
-app.UseCors("AllowAll");
+app.UseCors("AllowSpecific");
 
 // Disable HTTPS redirection in production (Render handles SSL termination)
 if (!builder.Environment.IsProduction())
