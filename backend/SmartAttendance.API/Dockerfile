@@ -5,10 +5,10 @@ WORKDIR /app
 COPY . .
 
 # Restore dependencies
-RUN dotnet restore
+RUN dotnet restore SmartAttendance.API.csproj
 
 # Build project
-RUN dotnet publish -c Release -o out
+RUN dotnet publish SmartAttendance.API.csproj -c Release -o out
 
 # Runtime image
 FROM mcr.microsoft.com/dotnet/aspnet:8.0
