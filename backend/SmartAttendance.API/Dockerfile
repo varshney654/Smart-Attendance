@@ -1,17 +1,13 @@
 FROM mcr.microsoft.com/dotnet/sdk:8.0 AS build
-WORKDIR /src
+WORKDIR /app
 
-# copy csproj
-COPY backend/SmartAttendance.API/SmartAttendance.API.csproj ./SmartAttendance.API/
-RUN dotnet restore ./SmartAttendance.API/SmartAttendance.API.csproj
+COPY . .
 
-# copy full source
-COPY backend/SmartAttendance.API/ ./SmartAttendance.API/
+WORKDIR /app/backend/SmartAttendance.API
 
-WORKDIR /src/SmartAttendance.API
+RUN dotnet restore
 RUN dotnet publish -c Release -o /app/publish
 
-# runtime
 FROM mcr.microsoft.com/dotnet/aspnet:8.0
 WORKDIR /app
 
