@@ -4,18 +4,17 @@ WORKDIR /app
 # Copy everything
 COPY . .
 
-# Restore dependencies
-RUN dotnet restore SmartAttendance.API.csproj
+# Go inside backend folder
+WORKDIR /app/backend/SmartAttendance.API
 
-# Build project
-RUN dotnet publish SmartAttendance.API.csproj -c Release -o out
+# Restore + build
+RUN dotnet restore
+RUN dotnet publish -c Release -o out
 
 # Runtime image
 FROM mcr.microsoft.com/dotnet/aspnet:8.0
 WORKDIR /app
 
-# Copy build output
-COPY --from=build /app/out .
+COPY --from=build /app/backend/SmartAttendance.API/out .
 
-# Run app
 ENTRYPOINT ["dotnet", "SmartAttendance.API.dll"]
