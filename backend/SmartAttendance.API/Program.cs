@@ -61,13 +61,17 @@ builder.Services.AddControllers();
 builder.Services.AddEndpointsApiExplorer();
 builder.Services.AddSwaggerGen();
 
-// CORS - allow only the deployed frontend origin
+// CORS - allow local development and deployed frontend origin
 builder.Services.AddCors(options =>
 {
     options.AddPolicy("AllowSpecific",
         builder =>
         {
-            builder.WithOrigins("https://smart-attendance-2-jimq.onrender.com")
+            builder.WithOrigins(
+                    "https://smart-attendance-2-jimq.onrender.com",
+                    "http://localhost:5173",
+                    "http://127.0.0.1:5173"
+                )
                    .AllowAnyMethod()
                    .AllowAnyHeader();
         });
@@ -119,6 +123,8 @@ app.Urls.Add($"http://0.0.0.0:{port}");
 app.MapGet("/health", () => Results.Ok(new { status = "healthy", timestamp = DateTime.UtcNow }));
 
 // --- SMTP DIAGNOSTIC BOOT TEST ---
+// Temporarily disabled to prevent confusing terminal errors when the email credentials are invalid.
+/*
 Console.WriteLine("\n[DIAGNOSTIC] Executing Startup SMTP Ping Test...");
 try
 {
@@ -127,6 +133,7 @@ try
     {
         EnableSsl = true,
         UseDefaultCredentials = false,
+        // It is recommended to use an App Password here instead of a regular password.
         Credentials = new System.Net.NetworkCredential("ajayvarshney2429@gmail.com", "dzcetjdsnxcqrutjye")
     };
 
@@ -158,5 +165,6 @@ catch (Exception ex)
     Console.WriteLine($"[DIAGNOSTIC] Stack Trace: {ex.StackTrace}");
 }
 Console.WriteLine("--------------------------------------------------\n");
+*/
 
 app.Run();

@@ -120,6 +120,8 @@ namespace SmartAttendance.API.Controllers
                 {
                     EnableSsl = true,
                     UseDefaultCredentials = false,
+                    // IMPORTANT: Google no longer supports "Less Secure Apps". 
+                    // You MUST use a 16-character "App Password" here instead of your normal account password.
                     Credentials = new System.Net.NetworkCredential("ajayvarshney2429@gmail.com", "dzcetjdsnxcqrutjye")
                 };
 
