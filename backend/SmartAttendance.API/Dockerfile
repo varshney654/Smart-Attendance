@@ -1,9 +1,8 @@
-# Use .NET SDK image
 FROM mcr.microsoft.com/dotnet/sdk:8.0 AS build
 WORKDIR /app
 
-# Copy full backend folder
-COPY backend/SmartAttendance.API ./ 
+# Copy everything
+COPY . .
 
 # Restore dependencies
 RUN dotnet restore
