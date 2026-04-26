@@ -24,7 +24,6 @@ builder.Services.Configure<DatabaseSettings>(
 
 builder.Services.AddSingleton<MongoDbService>();
 
-
 // Register Prisma-like ORM Context
 builder.Services.AddSingleton<PrismaDbContext>(sp =>
 {
@@ -76,7 +75,11 @@ builder.Services.AddCors(options =>
 
 var app = builder.Build();
 
-if (app.Environment.IsDevelopment())
+// Enable Swagger if ENABLE_SWAGGER environment variable is set to "true" OR in Development
+var enableSwagger = app.Environment.IsDevelopment() || 
+                    Environment.GetEnvironmentVariable("ENABLE_SWAGGER")?.ToLower() == "true";
+
+if (enableSwagger)
 {
     app.UseSwagger();
     app.UseSwaggerUI();
@@ -94,6 +97,18 @@ app.UseAuthentication();
 app.UseAuthorization();
 
 app.MapControllers();
+
+// Root endpoint - redirects to Swagger UI
+app.MapGet("/", () =>
+    Results.Content(@"<!DOCTYPE html>
+<html>
+<head>
+    <meta http-equiv='refresh' content='0; url=/swagger' />
+</head>
+<body>
+    <p>Redirecting to <a href='/swagger'>Swagger UI</a>...</p>
+</body>
+</html>", "text/html"));
 
 // Configure port from environment variable (required for Render)
 // Render sets the PORT environment variable, so we must listen on that port
