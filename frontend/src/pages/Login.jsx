@@ -70,21 +70,21 @@ const Login = () => {
     }}>
       <div className="card glass animate-fade-in" style={{ width: '100%', maxWidth: '420px', padding: '2.5rem' }}>
         <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', marginBottom: '2rem' }}>
-          <div style={{
-            background: 'linear-gradient(135deg, var(--primary), var(--secondary))',
-            color: 'white',
-            padding: '1rem',
-            borderRadius: '1rem',
-            marginBottom: '1rem',
-            boxShadow: 'var(--shadow-lg)'
-          }}>
-            <Camera size={32} />
-          </div>
-          <h2 style={{ fontSize: '1.5rem', textAlign: 'center', color: 'var(--text-main)', margin: 0 }}>
-            Welcome Back
+          <img 
+            src="/logo.png" 
+            alt="Smart Attendance Logo" 
+            style={{ 
+              width: '64px', 
+              height: '64px', 
+              objectFit: 'contain',
+              marginBottom: '1rem' 
+            }} 
+          />
+          <h2 style={{ fontSize: '1.75rem', fontWeight: 700, textAlign: 'center', color: 'var(--text-main)', margin: 0 }}>
+            Smart Attendance
           </h2>
-          <p style={{ color: 'var(--text-muted)', margin: '0.25rem 0 0' }}>
-            Sign in to Smart Attendance
+          <p style={{ color: 'var(--text-muted)', margin: '0.5rem 0 0', fontSize: '0.9rem', fontWeight: 500 }}>
+            Your Digital Attendance System
           </p>
         </div>
 

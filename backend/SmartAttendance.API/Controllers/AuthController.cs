@@ -229,6 +229,11 @@ namespace SmartAttendance.API.Controllers
                     Subject = "Your Smart Attendance Account Details",
                     Body = $@"
 <div style='font-family: Arial, sans-serif; color: #333; line-height: 1.6;'>
+    <div style='text-align: center; margin-bottom: 1.5rem;'>
+        <img src='https://smart-attendance-2-jimq.onrender.com/logo.png' alt='Smart Attendance Logo' style='width: 64px; height: 64px; margin-bottom: 0.5rem;' />
+        <h2 style='margin: 0; color: #1e293b;'>Smart Attendance</h2>
+        <p style='margin: 0; color: #64748b; font-size: 0.9rem;'>Your Digital Attendance System</p>
+    </div>
     <p>Hello,</p>
     <p>Your access request for the Smart Attendance System has been approved ✅</p>
     <p>Here are your login credentials:</p>

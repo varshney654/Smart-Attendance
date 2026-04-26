@@ -18,9 +18,12 @@ const Header = () => {
       top: 0,
       zIndex: 5
     }}>
-      <h1 style={{ fontSize: '1.25rem', fontWeight: 600, color: 'var(--text-main)', margin: 0 }}>
-        {user?.role === 'Admin' ? 'Admin Dashboard' : 'Dashboard'}
-      </h1>
+      <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
+        <img src="/logo.png" alt="Smart Attendance Logo" style={{ width: '32px', height: '32px', objectFit: 'contain' }} />
+        <h1 style={{ fontSize: '1.25rem', fontWeight: 600, color: 'var(--text-main)', margin: 0 }}>
+          Smart Attendance
+        </h1>
+      </div>
 
       <button
         onClick={logout}
