@@ -184,11 +184,38 @@ namespace SmartAttendance.API.Controllers
         }
 
         [HttpPost("/api/request-access")]
-        public IActionResult RequestAccess([FromBody] RequestAccessDto request)
+        public async Task<IActionResult> RequestAccess([FromBody] RequestAccessDto request)
         {
             try
             {
-                Console.WriteLine($"[SMTP] Request Access from {request.Email}");
+                var existingUser = await _users.FindByEmailAsync(request.Email);
+                if (existingUser != null)
+                {
+                    return BadRequest(new { success = false, message = "Email already in use." });
+                }
+
+                var randomDigits = new Random().Next(1000, 9999);
+                var password = $"User@{randomDigits}";
+
+                var user = new User
+                {
+                    Name = request.Name,
+                    Email = request.Email,
+                    Role = request.Role,
+                    Password = BCrypt.Net.BCrypt.HashPassword(password)
+                };
+                await _users.CreateAsync(user);
+
+                var accessRequest = new AccessRequest
+                {
+                    Name = request.Name,
+                    Email = request.Email,
+                    Role = request.Role,
+                    Status = "Approved"
+                };
+                await _db.AccessRequests.CreateAsync(accessRequest);
+
+                Console.WriteLine($"[SMTP] Sending account details to {request.Email}");
                 using var smtpClient = new System.Net.Mail.SmtpClient("smtp.gmail.com", 587)
                 {
                     EnableSsl = true,
@@ -199,20 +226,102 @@ namespace SmartAttendance.API.Controllers
                 var mailMessage = new System.Net.Mail.MailMessage
                 {
                     From = new System.Net.Mail.MailAddress("smartattendance63@gmail.com", "Smart Attendance System"),
-                    Subject = "New Access Request",
-                    Body = $"<p>A new user has requested access to the system:</p><ul><li><strong>Name:</strong> {request.Name}</li><li><strong>Email:</strong> {request.Email}</li><li><strong>Role:</strong> {request.Role}</li></ul>",
+                    Subject = "Your Smart Attendance Account Details",
+                    Body = $@"
+<div style='font-family: Arial, sans-serif; color: #333; line-height: 1.6;'>
+    <p>Hello,</p>
+    <p>Your access request for the Smart Attendance System has been approved ✅</p>
+    <p>Here are your login credentials:</p>
+    <p>
+        <strong>Email:</strong> {request.Email}<br>
+        <strong>Password:</strong> {password}
+    </p>
+    <p>🔐 Please change your password after first login for security purposes.</p>
+    <p>You can login here:<br><a href='https://smart-attendance-2-jimq.onrender.com' style='color: #1a73e8;'>https://smart-attendance-2-jimq.onrender.com</a></p>
+    <p>If you face any issues, feel free to reply to this email.</p>
+    <p>Regards,<br>Smart Attendance Team</p>
+</div>",
                     IsBodyHtml = true
                 };
-                mailMessage.To.Add("smartattendance63@gmail.com");
+                mailMessage.To.Add(request.Email);
 
                 smtpClient.Send(mailMessage);
-                return Ok(new { success = true, message = "Request submitted successfully" });
+                return Ok(new { success = true, message = "Account created successfully. Check your email." });
             }
             catch (Exception ex)
             {
                 Console.WriteLine($"[SMTP ERROR] {ex.Message}");
                 return StatusCode(500, new { success = false, message = "Failed to submit request." });
             }
+        }
+
+        [HttpGet("/api/requests")]
+        public async Task<IActionResult> GetRequests()
+        {
+            var requests = await _db.AccessRequests.FindAllAsync();
+            return Ok(requests);
+        }
+
+        [HttpPost("/api/approve/{id}")]
+        public async Task<IActionResult> ApproveRequest(string id)
+        {
+            var request = await _db.AccessRequests.FindByIdAsync(id);
+            if (request == null) return NotFound(new { message = "Request not found" });
+            if (request.Status != "Pending") return BadRequest(new { message = "Request is already processed" });
+
+            // Generate simple random password
+            var randomDigits = new Random().Next(1000, 9999);
+            var password = $"User@{randomDigits}";
+            
+            var user = new User
+            {
+                Name = request.Name,
+                Email = request.Email,
+                Role = request.Role,
+                Password = BCrypt.Net.BCrypt.HashPassword(password)
+            };
+            await _users.CreateAsync(user);
+
+            request.Status = "Approved";
+            await _db.AccessRequests.UpdateAsync(id, request);
+
+            try
+            {
+                using var smtpClient = new System.Net.Mail.SmtpClient("smtp.gmail.com", 587)
+                {
+                    EnableSsl = true,
+                    UseDefaultCredentials = false,
+                    Credentials = new System.Net.NetworkCredential("smartattendance63@gmail.com", "coms wezm orhg pzbt")
+                };
+
+                var mailMessage = new System.Net.Mail.MailMessage
+                {
+                    From = new System.Net.Mail.MailAddress("smartattendance63@gmail.com", "Smart Attendance System"),
+                    Subject = "Access Request Approved",
+                    Body = $"<p>Your access request has been approved.</p><p>You can now log in with the following credentials:</p><ul><li><strong>Email:</strong> {request.Email}</li><li><strong>Password:</strong> {password}</li></ul><p>Please change your password after logging in.</p>",
+                    IsBodyHtml = true
+                };
+                mailMessage.To.Add(request.Email);
+
+                smtpClient.Send(mailMessage);
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine($"[SMTP ERROR] {ex.Message}");
+            }
+
+            return Ok(new { success = true, message = "Request approved and user created." });
+        }
+
+        [HttpPost("/api/reject/{id}")]
+        public async Task<IActionResult> RejectRequest(string id)
+        {
+            var request = await _db.AccessRequests.FindByIdAsync(id);
+            if (request == null) return NotFound(new { message = "Request not found" });
+            
+            request.Status = "Rejected";
+            await _db.AccessRequests.UpdateAsync(id, request);
+            return Ok(new { success = true, message = "Request rejected." });
         }
 
         private string GenerateJwtToken(User user)

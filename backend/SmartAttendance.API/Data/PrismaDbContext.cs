@@ -182,6 +182,24 @@ namespace SmartAttendance.API.Data
     }
 
     /// <summary>
+    /// Access Request Repository - Prisma-like operations for AccessRequest model
+    /// </summary>
+    public interface IAccessRequestRepository : IRepository<AccessRequest>
+    {
+        Task<IEnumerable<AccessRequest>> FindPendingAsync();
+    }
+
+    public class AccessRequestRepository : MongoRepository<AccessRequest>, IAccessRequestRepository
+    {
+        public AccessRequestRepository(IMongoCollection<AccessRequest> collection) : base(collection) { }
+
+        public async Task<IEnumerable<AccessRequest>> FindPendingAsync()
+        {
+            return await FindManyAsync(r => r.Status == "Pending");
+        }
+    }
+
+    /// <summary>
     /// Prisma-like Database Client - Single entry point for all database operations
     /// </summary>
     public class PrismaDbContext
@@ -196,5 +214,6 @@ namespace SmartAttendance.API.Data
         public IUserRepository Users => new UserRepository(_database.GetCollection<User>("Users"));
         public IAttendanceRepository Attendances => new AttendanceRepository(_database.GetCollection<Attendance>("Attendance"));
         public IAlertRepository Alerts => new AlertRepository(_database.GetCollection<Alert>("Alerts"));
+        public IAccessRequestRepository AccessRequests => new AccessRequestRepository(_database.GetCollection<AccessRequest>("AccessRequests"));
     }
 }

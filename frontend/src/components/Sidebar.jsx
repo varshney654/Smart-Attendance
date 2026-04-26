@@ -9,11 +9,11 @@ import {
   Users, 
   FileBox, 
   BellRing,
-  LogOut
+  UserPlus
 } from 'lucide-react';
 
 const Sidebar = () => {
-  const { user, logout } = useContext(AuthContext);
+  const { user } = useContext(AuthContext);
 
   const links = [
     { to: '/', label: 'Dashboard', icon: <LayoutDashboard size={20} /> },
@@ -27,6 +27,7 @@ const Sidebar = () => {
   if (user?.role === 'Admin') {
     links.splice(4, 0, { to: '/users', label: 'Manage Users', icon: <Users size={20} /> });
     links.splice(5, 0, { to: '/register-face', label: 'Register Face', icon: <Camera size={20} /> });
+    links.splice(6, 0, { to: '/admin-requests', label: 'Admin Requests', icon: <UserPlus size={20} /> });
   }
 
   return (
@@ -99,23 +100,6 @@ const Sidebar = () => {
             <p style={{ margin: 0, fontSize: '0.75rem', color: 'var(--text-muted)' }}>{user?.role}</p>
           </div>
         </div>
-        <button 
-          onClick={logout}
-          style={{
-            display: 'flex',
-            alignItems: 'center',
-            gap: '0.75rem',
-            width: '100%',
-            padding: '0.75rem 1rem',
-            color: 'var(--danger)',
-            fontWeight: 500,
-            borderRadius: '0.5rem',
-            backgroundColor: 'rgba(239, 68, 68, 0.1)',
-          }}
-        >
-          <LogOut size={20} />
-          Logout
-        </button>
       </div>
     </aside>
   );

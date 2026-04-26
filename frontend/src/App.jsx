@@ -13,6 +13,7 @@ import Reports from './pages/Reports';
 import Alerts from './pages/Alerts';
 import RegisterFace from './pages/RegisterFace';
 import RequestAccess from './pages/RequestAccess';
+import AdminRequests from './pages/AdminRequests';
 
 const ProtectedRoute = ({ children, roles }) => {
   const { user } = useContext(AuthContext);
@@ -48,6 +49,7 @@ function App() {
         <Route path="analytics" element={<Analytics />} />
         <Route path="users" element={<ProtectedRoute roles={['Admin']}><ManageUsers /></ProtectedRoute>} />
         <Route path="register-face" element={<ProtectedRoute roles={['Admin']}><RegisterFace /></ProtectedRoute>} />
+        <Route path="admin-requests" element={<ProtectedRoute roles={['Admin']}><AdminRequests /></ProtectedRoute>} />
         <Route path="reports" element={<Reports />} />
         <Route path="alerts" element={<Alerts />} />
       </Route>
