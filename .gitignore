@@ -40,5 +40,7 @@ coverage/
 *.tmp
 *.temp
 
-# MongoDB data (local)
-data/
+# MongoDB data (local) - only ignore a lowercase 'data' folder at repo root
+/data/
+!backend/SmartAttendance.API/Data/
+
