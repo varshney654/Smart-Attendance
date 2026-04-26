@@ -1,20 +1,24 @@
 FROM mcr.microsoft.com/dotnet/sdk:8.0 AS build
 WORKDIR /app
 
-# Copy everything
-COPY . .
+# project file copy
+COPY backend/SmartAttendance.API/*.csproj ./SmartAttendance.API/
+WORKDIR /app/SmartAttendance.API
 
-# Go inside backend folder
-WORKDIR /app/backend/SmartAttendance.API
-
-# Restore + build
 RUN dotnet restore
-RUN dotnet publish -c Release -o out
 
-# Runtime image
+# baaki files copy
+COPY backend/SmartAttendance.API/. .
+
+RUN dotnet publish -c Release -o /app/publish
+
+# runtime
 FROM mcr.microsoft.com/dotnet/aspnet:8.0
 WORKDIR /app
 
-COPY --from=build /app/backend/SmartAttendance.API/out .
+COPY --from=build /app/publish .
+
+EXPOSE 5000
+ENV ASPNETCORE_URLS=http://+:5000
 
 ENTRYPOINT ["dotnet", "SmartAttendance.API.dll"]
