@@ -14,6 +14,7 @@ namespace SmartAttendance.API.Data
         Task<IEnumerable<T>> FindAllAsync();
         Task<IEnumerable<T>> FindManyAsync(Expression<Func<T, bool>> filter);
         Task<T?> FindFirstAsync(Expression<Func<T, bool>> filter);
+        Task<T?> FindProjectedAsync(Expression<Func<T, bool>> filter, ProjectionDefinition<T> projection);
         Task<T> CreateAsync(T entity);
         Task<T> UpdateAsync(string id, T entity);
         Task<bool> DeleteAsync(string id);
@@ -58,6 +59,11 @@ namespace SmartAttendance.API.Data
             return await _collection.Find(filter).FirstOrDefaultAsync();
         }
 
+        public async Task<T?> FindProjectedAsync(Expression<Func<T, bool>> filter, ProjectionDefinition<T> projection)
+        {
+            return await _collection.Find(filter).Project<T>(projection).FirstOrDefaultAsync();
+        }
+
         public async Task<T> CreateAsync(T entity)
         {
             await _collection.InsertOneAsync(entity);
@@ -99,6 +105,7 @@ namespace SmartAttendance.API.Data
     public interface IUserRepository : IRepository<User>
     {
         Task<User?> FindByEmailAsync(string email);
+        Task<User?> FindByEmailWithoutFaceDataAsync(string email);
         Task<User?> FindByRoleAsync(string role);
         Task<IEnumerable<User>> FindByDepartmentAsync(string department);
     }
@@ -110,6 +117,12 @@ namespace SmartAttendance.API.Data
         public async Task<User?> FindByEmailAsync(string email)
         {
             return await FindFirstAsync(u => u.Email == email);
+        }
+
+        public async Task<User?> FindByEmailWithoutFaceDataAsync(string email)
+        {
+            var projection = Builders<User>.Projection.Exclude(u => u.FaceData);
+            return await FindProjectedAsync(u => u.Email == email, projection);
         }
 
         public async Task<User?> FindByRoleAsync(string role)

@@ -3,6 +3,7 @@ import { AuthContext } from '../context/AuthContext';
 import api from '../utils/api';
 import { useNavigate, Link } from 'react-router-dom';
 import { Camera, User, Briefcase, GraduationCap } from 'lucide-react';
+import LoginIntro from '../components/LoginIntro';
 
 const Login = () => {
   // Form state
@@ -33,9 +34,32 @@ const Login = () => {
       return;
     }
 
+    console.log('[LOGIN START]');
+
+    const executeLogin = async (retryCount = 0) => {
+      try {
+        console.log('[REQUEST SENT]');
+        return await api.post('/auth/login', { email, password, role }, { timeout: 5000 });
+      } catch (error) {
+        if (error.code === 'ECONNABORTED' && retryCount < 1) {
+          console.log('[REQUEST TIMEOUT] Retrying authentication...');
+          console.log('[REQUEST SENT]');
+          return await api.post('/auth/login', { email, password, role }, { timeout: 5000 });
+        }
+        throw error;
+      }
+    };
+
     try {
-      const response = await api.post('/auth/login', { email, password, role });
+      const response = await executeLogin();
+      console.log('[RESPONSE RECEIVED]');
+      
       login(response.data.user, response.data.token);
+      console.log('[JWT RECEIVED]');
+      
+      console.log('[ROLE VERIFIED]');
+      console.log('[NAVIGATING TO DASHBOARD]');
+      console.log('[LOGIN SUCCESS]');
 
       // Redirect intelligently based exactly on the Role requested by User prompt
       if (response.data.user.role === 'Admin') {
@@ -48,6 +72,8 @@ const Login = () => {
         navigate('/'); // Fallback
       }
     } catch (err) {
+      console.log('[LOGIN FAILED]');
+      console.error('Detailed Error:', err);
       setError(
         err.response?.data?.message ||
         err.response?.data?.title ||
@@ -60,15 +86,8 @@ const Login = () => {
   };
 
   return (
-    <div style={{
-      minHeight: '100vh',
-      display: 'flex',
-      alignItems: 'center',
-      justifyContent: 'center',
-      background: 'linear-gradient(135deg, #f0f4ff 0%, #e0e7ff 100%)',
-      padding: '1rem'
-    }}>
-      <div className="card glass animate-fade-in" style={{ width: '100%', maxWidth: '420px', padding: '2.5rem' }}>
+    <LoginIntro>
+      <div className="card glass animate-fade-in dark-glass-card" style={{ width: '100%', maxWidth: '420px', padding: '2.5rem' }}>
         <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', marginBottom: '2rem' }}>
           <img 
             src="/logo.png" 
@@ -77,13 +96,14 @@ const Login = () => {
               width: '64px', 
               height: '64px', 
               objectFit: 'contain',
-              marginBottom: '1rem' 
+              marginBottom: '1rem',
+              filter: 'drop-shadow(0 0 8px rgba(255,255,255,0.3))'
             }} 
           />
-          <h2 style={{ fontSize: '1.75rem', fontWeight: 700, textAlign: 'center', color: 'var(--text-main)', margin: 0 }}>
-            Smart Attendance
+          <h2 className="dark-text" style={{ fontSize: '1.75rem', fontWeight: 700, textAlign: 'center', margin: 0 }}>
+            <span className="text-smart">Smart</span> Attendance
           </h2>
-          <p style={{ color: 'var(--text-muted)', margin: '0.5rem 0 0', fontSize: '0.9rem', fontWeight: 500 }}>
+          <p className="dark-text-muted" style={{ margin: '0.5rem 0 0', fontSize: '0.9rem', fontWeight: 500 }}>
             Your Digital Attendance System
           </p>
         </div>
@@ -128,18 +148,16 @@ const Login = () => {
 
           {/* Unified Role Toggle Selection (Glassmorphism Pill design) */}
           <div style={{ marginBottom: '1.5rem' }}>
-            <label className="input-label" style={{ textAlign: 'center', display: 'block' }}>Select Role</label>
-            <div style={{
+            <label className="input-label dark-text" style={{ textAlign: 'center', display: 'block' }}>Select Role</label>
+            <div className="dark-role-selector" style={{
               display: 'flex',
-              backgroundColor: 'rgba(255, 255, 255, 0.5)',
-              border: '1px solid var(--border)',
               borderRadius: '0.75rem',
-              padding: '0.25rem',
-              gap: '0.25rem'
+              marginTop: '0.5rem'
             }}>
               <button
                 type="button"
                 onClick={() => handleRoleChange('Admin')}
+                className={role === 'Admin' ? 'dark-role-btn-active' : 'dark-role-btn-inactive'}
                 style={{
                   flex: 1,
                   display: 'flex',
@@ -153,9 +171,7 @@ const Login = () => {
                   fontWeight: 500,
                   cursor: 'pointer',
                   transition: 'all 0.2s ease',
-                  backgroundColor: role === 'Admin' ? 'white' : 'transparent',
-                  color: role === 'Admin' ? 'var(--primary)' : 'var(--text-muted)',
-                  boxShadow: role === 'Admin' ? '0 2px 4px rgba(0,0,0,0.05)' : 'none'
+                  backgroundColor: 'transparent'
                 }}
               >
                 <User size={16} /> Admin
@@ -163,6 +179,7 @@ const Login = () => {
               <button
                 type="button"
                 onClick={() => handleRoleChange('Employee')}
+                className={role === 'Employee' ? 'dark-role-btn-active' : 'dark-role-btn-inactive'}
                 style={{
                   flex: 1,
                   display: 'flex',
@@ -176,9 +193,7 @@ const Login = () => {
                   fontWeight: 500,
                   cursor: 'pointer',
                   transition: 'all 0.2s ease',
-                  backgroundColor: role === 'Employee' ? 'white' : 'transparent',
-                  color: role === 'Employee' ? 'var(--primary)' : 'var(--text-muted)',
-                  boxShadow: role === 'Employee' ? '0 2px 4px rgba(0,0,0,0.05)' : 'none'
+                  backgroundColor: 'transparent'
                 }}
               >
                 <Briefcase size={16} /> Employee
@@ -186,6 +201,7 @@ const Login = () => {
               <button
                 type="button"
                 onClick={() => handleRoleChange('Student')}
+                className={role === 'Student' ? 'dark-role-btn-active' : 'dark-role-btn-inactive'}
                 style={{
                   flex: 1,
                   display: 'flex',
@@ -199,9 +215,7 @@ const Login = () => {
                   fontWeight: 500,
                   cursor: 'pointer',
                   transition: 'all 0.2s ease',
-                  backgroundColor: role === 'Student' ? 'white' : 'transparent',
-                  color: role === 'Student' ? 'var(--primary)' : 'var(--text-muted)',
-                  boxShadow: role === 'Student' ? '0 2px 4px rgba(0,0,0,0.05)' : 'none'
+                  backgroundColor: 'transparent'
                 }}
               >
                 <GraduationCap size={16} /> Student
@@ -210,11 +224,11 @@ const Login = () => {
           </div>
 
           <div className="input-group">
-            <label className="input-label" htmlFor="email">Email</label>
+            <label className="input-label dark-text" htmlFor="email">Email</label>
             <input
               id="email"
               type="email"
-              className="input-field"
+              className="input-field dark-input-field"
               placeholder="user@example.com"
               value={email}
               onChange={(e) => setEmail(e.target.value)}
@@ -224,15 +238,15 @@ const Login = () => {
 
           <div className="input-group" style={{ marginBottom: '1rem' }}>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-              <label className="input-label" htmlFor="password" style={{ marginBottom: 0 }}>Password</label>
-              <Link to="/forgot-password" style={{ fontSize: '0.875rem', color: 'var(--primary)', textDecoration: 'none', fontWeight: 500 }}>
+              <label className="input-label dark-text" htmlFor="password" style={{ marginBottom: 0 }}>Password</label>
+              <Link to="/forgot-password" style={{ fontSize: '0.875rem', color: '#22c55e', textDecoration: 'none', fontWeight: 500 }}>
                 Forgot Password?
               </Link>
             </div>
             <input
               id="password"
               type="password"
-              className="input-field"
+              className="input-field dark-input-field"
               style={{ marginTop: '0.5rem' }}
               placeholder="••••••••"
               value={password}
@@ -243,7 +257,7 @@ const Login = () => {
 
           <button
             type="submit"
-            className="btn btn-primary"
+            className="btn green-submit-btn"
             style={{ width: '100%', padding: '0.875rem', fontSize: '1rem', marginTop: '1rem' }}
             disabled={loading}
           >
@@ -251,16 +265,16 @@ const Login = () => {
           </button>
         </form>
 
-        <div style={{ textAlign: 'center', marginTop: '1.5rem', paddingTop: '1.5rem', borderTop: '1px solid var(--border)' }}>
-          <span style={{ color: 'var(--text-muted)', fontSize: '0.875rem' }}>
+        <div style={{ textAlign: 'center', marginTop: '1.5rem', paddingTop: '1.5rem', borderTop: '1px solid rgba(255,255,255,0.1)' }}>
+          <span className="dark-text-muted" style={{ fontSize: '0.875rem' }}>
             Need an account?{' '}
-            <Link to="/request-access" style={{ color: 'var(--primary)', textDecoration: 'none', fontWeight: 500 }}>
+            <Link to="/request-access" style={{ color: '#22c55e', textDecoration: 'none', fontWeight: 500 }}>
               Request Access
             </Link>
           </span>
         </div>
       </div>
-    </div>
+    </LoginIntro>
   );
 };
 

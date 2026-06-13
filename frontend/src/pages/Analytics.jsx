@@ -12,122 +12,117 @@ const Analytics = () => {
   const [timeRange, setTimeRange] = useState('30 Days');
 
   useEffect(() => {
-    fetchAnalytics();
-  }, [timeRange]);
+    const fetchAnalytics = async () => {
+      try {
+        // Fetch dashboard data
+        const res = await api.get('/analytics/dashboard');
+        
+        // Fetch all attendance records for the period
+        const recordsRes = await api.get('/attendance', {
+          params: { dateRange: timeRange }
+        });
 
-  const fetchAnalytics = async () => {
-    try {
-      // Fetch dashboard data
-      const res = await api.get('/analytics/dashboard');
+        const records = recordsRes.data;
+        const totalRecords = records.length;
 
-      // Calculate days based on timeRange
-      let days = 30;
-      if (timeRange === '7 Days') days = 7;
-      else if (timeRange === '90 Days') days = 90;
+        // Calculate late arrivals from real data
+        const lateArrivals = records.filter(r => r.status === 'Late').length;
 
-      // Fetch all attendance records for the period
-      const recordsRes = await api.get('/attendance', {
-        params: { dateRange: timeRange }
-      });
+        // Calculate real trend percentage
+        const presentCount = records.filter(r => r.status === 'Present' || r.status === 'Late').length;
+        const avgAttendance = totalRecords > 0 ? (presentCount / totalRecords) * 100 : 0;
 
-      const records = recordsRes.data;
-      const totalRecords = records.length;
+        // Calculate trend (compare first half to second half of period)
+        const midPoint = Math.floor(totalRecords / 2);
+        const firstHalfPresent = records.slice(0, midPoint).filter(r => r.status === 'Present' || r.status === 'Late').length;
+        const secondHalfPresent = records.slice(midPoint).filter(r => r.status === 'Present' || r.status === 'Late').length;
+        const firstHalfTotal = Math.max(1, midPoint);
+        const secondHalfTotal = Math.max(1, totalRecords - midPoint);
+        const firstHalfRate = (firstHalfPresent / firstHalfTotal) * 100;
+        const secondHalfRate = (secondHalfPresent / secondHalfTotal) * 100;
+        const trendPercent = firstHalfTotal > 0 ? ((secondHalfRate - firstHalfRate) / Math.max(1, firstHalfRate)) * 100 : 0;
 
-      // Calculate late arrivals from real data
-      const lateArrivals = records.filter(r => r.status === 'Late').length;
+        // Get department-wise data from users
+        const usersRes = await api.get('/users');
+        const users = usersRes.data;
 
-      // Calculate real trend percentage
-      const presentCount = records.filter(r => r.status === 'Present' || r.status === 'Late').length;
-      const avgAttendance = totalRecords > 0 ? (presentCount / totalRecords) * 100 : 0;
+        // Group users by department
+        const departmentMap = {};
+        users.forEach(user => {
+          const dept = user.department || 'Other';
+          if (!departmentMap[dept]) {
+            departmentMap[dept] = { present: 0, absent: 0, total: 0 };
+          }
+          departmentMap[dept].total++;
+        });
 
-      // Calculate trend (compare first half to second half of period)
-      const midPoint = Math.floor(totalRecords / 2);
-      const firstHalfPresent = records.slice(0, midPoint).filter(r => r.status === 'Present' || r.status === 'Late').length;
-      const secondHalfPresent = records.slice(midPoint).filter(r => r.status === 'Present' || r.status === 'Late').length;
-      const firstHalfTotal = Math.max(1, midPoint);
-      const secondHalfTotal = Math.max(1, totalRecords - midPoint);
-      const firstHalfRate = (firstHalfPresent / firstHalfTotal) * 100;
-      const secondHalfRate = (secondHalfPresent / secondHalfTotal) * 100;
-      const trendPercent = firstHalfTotal > 0 ? ((secondHalfRate - firstHalfRate) / Math.max(1, firstHalfRate)) * 100 : 0;
-
-      // Get department-wise data from users
-      const usersRes = await api.get('/users');
-      const users = usersRes.data;
-
-      // Group users by department
-      const departmentMap = {};
-      users.forEach(user => {
-        const dept = user.department || 'Other';
-        if (!departmentMap[dept]) {
-          departmentMap[dept] = { present: 0, absent: 0, total: 0 };
-        }
-        departmentMap[dept].total++;
-      });
-
-      // Count attendance by department (simplified - just use total records for now)
-      const deptData = Object.keys(departmentMap).map(dept => ({
-        name: dept,
-        present: Math.round(departmentMap[dept].total * (avgAttendance / 100)),
-        absent: departmentMap[dept].total - Math.round(departmentMap[dept].total * (avgAttendance / 100))
-      }));
-
-      // Generate attendance over time data
-      const baseTrend = res.data.trend || [];
-      const attendanceOverTime = baseTrend.map(item => ({
-        day: item.day,
-        presentCount: item.presentCount
-      }));
-
-      // Peak hours - calculate from real data
-      const hourMap = {};
-      records.forEach(record => {
-        if (record.time) {
-          const hour = record.time.split(':')[0];
-          hourMap[hour] = (hourMap[hour] || 0) + 1;
-        }
-      });
-
-      const peakHours = Object.keys(hourMap)
-        .sort()
-        .slice(0, 6)
-        .map(hour => ({
-          time: `${hour}:00`,
-          count: hourMap[hour]
+        // Count attendance by department (simplified - just use total records for now)
+        const deptData = Object.keys(departmentMap).map(dept => ({
+          name: dept,
+          present: Math.round(departmentMap[dept].total * (avgAttendance / 100)),
+          absent: departmentMap[dept].total - Math.round(departmentMap[dept].total * (avgAttendance / 100))
         }));
 
-      const advancedData = {
-        avgAttendance: avgAttendance,
-        trendPercent: trendPercent.toFixed(1),
-        totalRecords: totalRecords,
-        lateArrivals: lateArrivals,
-        attendanceOverTime: attendanceOverTime,
-        peakHours: peakHours.length > 0 ? peakHours : [
-          { time: '09:00', count: 0 },
-          { time: '10:00', count: 0 },
-          { time: '11:00', count: 0 }
-        ],
-        departmentWise: deptData.length > 0 ? deptData : [
-          { name: 'No Data', present: 0, absent: 0 }
-        ]
-      };
+        // Generate attendance over time data
+        const baseTrend = res.data.trend || [];
+        const attendanceOverTime = baseTrend.map(item => ({
+          day: item.day,
+          presentCount: item.presentCount
+        }));
 
-      setData(advancedData);
-    } catch (error) {
-      console.error(error);
-      // Set empty data on error
-      setData({
-        avgAttendance: 0,
-        trendPercent: 0,
-        totalRecords: 0,
-        lateArrivals: 0,
-        attendanceOverTime: [],
-        peakHours: [],
-        departmentWise: []
-      });
-    } finally {
-      setLoading(false);
-    }
-  };
+        // Peak hours - calculate from real data
+        const hourMap = {};
+        records.forEach(record => {
+          if (record.time) {
+            const hour = record.time.split(':')[0];
+            hourMap[hour] = (hourMap[hour] || 0) + 1;
+          }
+        });
+
+        const peakHours = Object.keys(hourMap)
+          .sort()
+          .slice(0, 6)
+          .map(hour => ({
+            time: `${hour}:00`,
+            count: hourMap[hour]
+          }));
+
+        const advancedData = {
+          avgAttendance: avgAttendance,
+          trendPercent: trendPercent.toFixed(1),
+          totalRecords: totalRecords,
+          lateArrivals: lateArrivals,
+          attendanceOverTime: attendanceOverTime,
+          peakHours: peakHours.length > 0 ? peakHours : [
+            { time: '09:00', count: 0 },
+            { time: '10:00', count: 0 },
+            { time: '11:00', count: 0 }
+          ],
+          departmentWise: deptData.length > 0 ? deptData : [
+            { name: 'No Data', present: 0, absent: 0 }
+          ]
+        };
+
+        setData(advancedData);
+      } catch (error) {
+        console.error(error);
+        // Set empty data on error
+        setData({
+          avgAttendance: 0,
+          trendPercent: 0,
+          totalRecords: 0,
+          lateArrivals: 0,
+          attendanceOverTime: [],
+          peakHours: [],
+          departmentWise: []
+        });
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    fetchAnalytics();
+  }, [timeRange]);
 
   if (loading || !data) return <div>Loading Analytics...</div>;
 

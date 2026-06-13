@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, useCallback } from 'react';
 import * as faceapi from '@vladmandic/face-api';
 import api from '../utils/api';
 import { Camera, CheckCircle, XCircle, RefreshCw, X, AlertTriangle } from 'lucide-react';
@@ -13,14 +13,7 @@ const FaceRegistrationModal = ({ userId, userName, onClose, onSuccess }) => {
   const videoRef = useRef(null);
   const streamRef = useRef(null);
 
-  useEffect(() => {
-    loadModels();
-    return () => {
-      stopCamera();
-    };
-  }, []);
-
-  const loadModels = async () => {
+  const loadModels = useCallback(async () => {
     try {
       setStatus({ message: 'Loading AI models...', type: 'info' });
       await faceapi.nets.tinyFaceDetector.loadFromUri('/models');
@@ -33,7 +26,14 @@ const FaceRegistrationModal = ({ userId, userName, onClose, onSuccess }) => {
       setStatus({ message: `Failed to load AI models: ${err.message}`, type: 'error' });
       console.error(err);
     }
-  };
+  }, []);
+
+  useEffect(() => {
+    loadModels();
+    return () => {
+      stopCamera();
+    };
+  }, [loadModels]);
 
   const startCamera = async () => {
     try {
@@ -45,8 +45,9 @@ const FaceRegistrationModal = ({ userId, userName, onClose, onSuccess }) => {
         streamRef.current = stream;
         videoRef.current.play();
         setCameraActive(true);
+        setStatus({ message: 'Camera started. Ensure good lighting and click Capture.', type: 'info' });
       }
-    } catch (err) {
+    } catch {
       setStatus({ message: 'Failed to access webcam.', type: 'error' });
     }
   };

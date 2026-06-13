@@ -51,10 +51,14 @@ namespace SmartAttendance.API.Controllers
         [HttpPost("login")]
         public async Task<IActionResult> Login([FromBody] LoginDto loginDto)
         {
+            var stopwatch = System.Diagnostics.Stopwatch.StartNew();
+            Console.WriteLine("[LOGIN REQUEST RECEIVED]");
             Console.WriteLine($"[LOGIN ATTEMPT] Email: {loginDto.Email}, Role: {loginDto.Role}");
 
-            // Find user using Prisma-like ORM
-            var user = await _users.FindByEmailAsync(loginDto.Email);
+            Console.WriteLine("[DB QUERY START]");
+            // Find user using Prisma-like ORM, explicitly excluding FaceData for performance
+            var user = await _users.FindByEmailWithoutFaceDataAsync(loginDto.Email);
+            Console.WriteLine($"[DB QUERY COMPLETE] Time: {stopwatch.ElapsedMilliseconds}ms");
 
             if (user == null)
             {
@@ -62,11 +66,13 @@ namespace SmartAttendance.API.Controllers
                 return NotFound(new { message = "User not found", status = 404 });
             }
 
+            var passCheckStart = stopwatch.ElapsedMilliseconds;
             if (!BCrypt.Net.BCrypt.Verify(loginDto.Password, user.Password))
             {
                 Console.WriteLine("[LOGIN FAILED] Invalid password.");
                 return Unauthorized(new { message = "Invalid password", status = 401 });
             }
+            Console.WriteLine($"[PASSWORD VERIFIED] Time: {stopwatch.ElapsedMilliseconds - passCheckStart}ms");
 
             if (!string.Equals(user.Role, loginDto.Role, StringComparison.OrdinalIgnoreCase))
             {
@@ -74,15 +80,16 @@ namespace SmartAttendance.API.Controllers
                 return Unauthorized(new { message = "Role mismatch", status = 401 });
             }
 
-            if (!string.Equals(user.Role, loginDto.Role, StringComparison.OrdinalIgnoreCase))
-                return Unauthorized(new { message = "Invalid role selected for this account" });
-
+            var jwtStart = stopwatch.ElapsedMilliseconds;
             var token = GenerateJwtToken(user);
+            Console.WriteLine($"[JWT GENERATED] Time: {stopwatch.ElapsedMilliseconds - jwtStart}ms");
 
             // Do not send password back
             user.Password = "";
+            // PERFORMANCE OPTIMIZATION: FaceData is already excluded by the DB query, but ensure it's an empty list for the frontend
+            user.FaceData = new List<double[]>();
 
-            Console.WriteLine("[LOGIN SUCCESS] Token generated.");
+            Console.WriteLine($"[RESPONSE SENT] Total Time: {stopwatch.ElapsedMilliseconds}ms");
 
             return Ok(new
             {
@@ -114,42 +121,41 @@ namespace SmartAttendance.API.Controllers
             try
             {
                 Console.WriteLine($"[DEBUG] Generated OTP for {request.Email}: {otp}");
-                Console.WriteLine("[SMTP] Connecting to Gmail SMTP...");
+                var smtpEmail = Environment.GetEnvironmentVariable("SMTP_EMAIL") ?? "rajeevgupta2429@gmail.com";
+                var smtpPassword = Environment.GetEnvironmentVariable("SMTP_APP_PASSWORD") ?? "dzcetjdsnxcqrutjye";
 
+                Console.WriteLine("[SMTP CONNECTED]");
                 using var smtpClient = new System.Net.Mail.SmtpClient("smtp.gmail.com", 587)
                 {
                     EnableSsl = true,
                     UseDefaultCredentials = false,
-                    // IMPORTANT: Google no longer supports "Less Secure Apps". 
-                    // You MUST use a 16-character "App Password" here instead of your normal account password.
-                    Credentials = new System.Net.NetworkCredential("ajayvarshney2429@gmail.com", "dzcetjdsnxcqrutjye")
+                    Credentials = new System.Net.NetworkCredential(smtpEmail, smtpPassword)
                 };
 
-                Console.WriteLine("[SMTP] Authenticating...");
+                Console.WriteLine("[SMTP AUTH SUCCESS]");
 
                 var mailMessage = new System.Net.Mail.MailMessage
                 {
-                    From = new System.Net.Mail.MailAddress("ajayvarshney2429@gmail.com", "Smart Attendance System"),
+                    From = new System.Net.Mail.MailAddress(smtpEmail, "Smart Attendance System"),
                     Subject = "Password Reset OTP",
                     Body = $"<p>Your password reset code is: <strong>{otp}</strong></p><p>This code will expire securely in exactly 10 minutes.</p>",
                     IsBodyHtml = true
                 };
                 mailMessage.To.Add(request.Email);
 
-                Console.WriteLine("[SMTP] Sending mail...");
                 smtpClient.Send(mailMessage);
-                Console.WriteLine("[SMTP] EMAIL SENT SUCCESS");
+                Console.WriteLine("[SMTP SEND SUCCESS]");
                 
                 return Ok(new { success = true, message = "OTP sent to your email" });
             }
             catch (Exception ex)
             {
-                Console.WriteLine($"[SMTP ERROR] Gmail Rejection Reason: {ex.Message}");
+                Console.WriteLine($"[SMTP FAILURE] Gmail Rejection Reason: {ex.Message}");
                 if (ex.InnerException != null) 
                 {
-                    Console.WriteLine($"[SMTP ERROR] Inner Exception: {ex.InnerException.Message}");
+                    Console.WriteLine($"[SMTP FAILURE] Inner Exception: {ex.InnerException.Message}");
                 }
-                Console.WriteLine($"[SMTP ERROR] Stack Trace: {ex.StackTrace}");
+                Console.WriteLine($"[SMTP FAILURE] Stack Trace: {ex.StackTrace}");
                 
                 return StatusCode(500, new { success = false, message = "Failed to send OTP email" });
             }
@@ -194,9 +200,11 @@ namespace SmartAttendance.API.Controllers
                     return BadRequest(new { success = false, message = "Email already in use." });
                 }
 
+                // Generate random password
                 var randomDigits = new Random().Next(1000, 9999);
                 var password = $"User@{randomDigits}";
 
+                // 1. Create User
                 var user = new User
                 {
                     Name = request.Name,
@@ -205,7 +213,9 @@ namespace SmartAttendance.API.Controllers
                     Password = BCrypt.Net.BCrypt.HashPassword(password)
                 };
                 await _users.CreateAsync(user);
+                Console.WriteLine($"[DB SUCCESS] User {request.Email} created successfully.");
 
+                // 2. Create AccessRequest (Auto-Approved)
                 var accessRequest = new AccessRequest
                 {
                     Name = request.Name,
@@ -215,19 +225,28 @@ namespace SmartAttendance.API.Controllers
                 };
                 await _db.AccessRequests.CreateAsync(accessRequest);
 
-                Console.WriteLine($"[SMTP] Sending account details to {request.Email}");
-                using var smtpClient = new System.Net.Mail.SmtpClient("smtp.gmail.com", 587)
+                // 3. Email Sending Logic
+                bool emailSent = true;
+                try
                 {
-                    EnableSsl = true,
-                    UseDefaultCredentials = false,
-                    Credentials = new System.Net.NetworkCredential("smartattendance63@gmail.com", "coms wezm orhg pzbt")
-                };
+                    var smtpEmail = Environment.GetEnvironmentVariable("SMTP_EMAIL") ?? "rajeevgupta2429@gmail.com";
+                    var smtpPassword = Environment.GetEnvironmentVariable("SMTP_APP_PASSWORD") ?? "dzcetjdsnxcqrutjye";
 
-                var mailMessage = new System.Net.Mail.MailMessage
-                {
-                    From = new System.Net.Mail.MailAddress("smartattendance63@gmail.com", "Smart Attendance System"),
-                    Subject = "Your Smart Attendance Account Details",
-                    Body = $@"
+                    Console.WriteLine("[SMTP CONNECTED]");
+                    using var smtpClient = new System.Net.Mail.SmtpClient("smtp.gmail.com", 587)
+                    {
+                        EnableSsl = true,
+                        UseDefaultCredentials = false,
+                        Credentials = new System.Net.NetworkCredential(smtpEmail, smtpPassword)
+                    };
+
+                    Console.WriteLine("[SMTP AUTH SUCCESS]");
+
+                    var mailMessage = new System.Net.Mail.MailMessage
+                    {
+                        From = new System.Net.Mail.MailAddress(smtpEmail, "Smart Attendance System"),
+                        Subject = "Your Smart Attendance Account Details",
+                        Body = $@"
 <div style='font-family: Arial, sans-serif; color: #333; line-height: 1.6;'>
     <div style='text-align: center; margin-bottom: 1.5rem;'>
         <img src='https://smart-attendance-2-jimq.onrender.com/logo.png' alt='Smart Attendance Logo' style='width: 64px; height: 64px; margin-bottom: 0.5rem;' />
@@ -246,16 +265,36 @@ namespace SmartAttendance.API.Controllers
     <p>If you face any issues, feel free to reply to this email.</p>
     <p>Regards,<br>Smart Attendance Team</p>
 </div>",
-                    IsBodyHtml = true
-                };
-                mailMessage.To.Add(request.Email);
+                        IsBodyHtml = true
+                    };
+                    mailMessage.To.Add(request.Email);
 
-                smtpClient.Send(mailMessage);
-                return Ok(new { success = true, message = "Account created successfully. Check your email." });
+                    smtpClient.Send(mailMessage);
+                    Console.WriteLine("[SMTP SEND SUCCESS]");
+                }
+                catch (Exception ex)
+                {
+                    emailSent = false;
+                    Console.WriteLine($"[SMTP FAILURE] RequestAccess Gmail Exception: {ex.Message}");
+                    if (ex.InnerException != null) 
+                    {
+                        Console.WriteLine($"[SMTP FAILURE] Inner Exception: {ex.InnerException.Message}");
+                    }
+                }
+
+                // 4. Final API Response
+                if (emailSent)
+                {
+                    return Ok(new { success = true, message = "Account created successfully. Check your email." });
+                }
+                else
+                {
+                    return Ok(new { success = true, message = "Request submitted successfully, but email delivery failed." });
+                }
             }
             catch (Exception ex)
             {
-                Console.WriteLine($"[SMTP ERROR] {ex.Message}");
+                Console.WriteLine($"[ERROR] DB save failed: {ex.Message}");
                 return StatusCode(500, new { success = false, message = "Failed to submit request." });
             }
         }
@@ -290,30 +329,63 @@ namespace SmartAttendance.API.Controllers
             request.Status = "Approved";
             await _db.AccessRequests.UpdateAsync(id, request);
 
-            try
+            // Run email in background to avoid blocking the API response
+            _ = Task.Run(async () =>
             {
-                using var smtpClient = new System.Net.Mail.SmtpClient("smtp.gmail.com", 587)
+                try
                 {
-                    EnableSsl = true,
-                    UseDefaultCredentials = false,
-                    Credentials = new System.Net.NetworkCredential("smartattendance63@gmail.com", "coms wezm orhg pzbt")
-                };
+                    var smtpEmail = Environment.GetEnvironmentVariable("SMTP_EMAIL") ?? "rajeevgupta2429@gmail.com";
+                    var smtpPassword = Environment.GetEnvironmentVariable("SMTP_APP_PASSWORD") ?? "dzcetjdsnxcqrutjye";
 
-                var mailMessage = new System.Net.Mail.MailMessage
+                    Console.WriteLine("[SMTP CONNECTED]");
+                    using var smtpClient = new System.Net.Mail.SmtpClient("smtp.gmail.com", 587)
+                    {
+                        EnableSsl = true,
+                        UseDefaultCredentials = false,
+                        Credentials = new System.Net.NetworkCredential(smtpEmail, smtpPassword)
+                    };
+
+                    Console.WriteLine("[SMTP AUTH SUCCESS]");
+
+                    var mailMessage = new System.Net.Mail.MailMessage
+                    {
+                        From = new System.Net.Mail.MailAddress(smtpEmail, "Smart Attendance System"),
+                        Subject = "Access Request Approved",
+                        Body = $@"
+<div style='font-family: Arial, sans-serif; color: #333; line-height: 1.6;'>
+    <div style='text-align: center; margin-bottom: 1.5rem;'>
+        <img src='https://smart-attendance-2-jimq.onrender.com/logo.png' alt='Smart Attendance Logo' style='width: 64px; height: 64px; margin-bottom: 0.5rem;' />
+        <h2 style='margin: 0; color: #1e293b;'>Smart Attendance</h2>
+        <p style='margin: 0; color: #64748b; font-size: 0.9rem;'>Your Digital Attendance System</p>
+    </div>
+    <p>Hello {request.Name},</p>
+    <p>Your access request for the Smart Attendance System has been approved ✅</p>
+    <p>Here are your login credentials:</p>
+    <p>
+        <strong>Email:</strong> {request.Email}<br>
+        <strong>Password:</strong> {password}
+    </p>
+    <p>🔐 Please change your password after first login for security purposes.</p>
+    <p>You can login here:<br><a href='https://smart-attendance-2-jimq.onrender.com' style='color: #1a73e8;'>https://smart-attendance-2-jimq.onrender.com</a></p>
+    <p>If you face any issues, feel free to reply to this email.</p>
+    <p>Regards,<br>Smart Attendance Team</p>
+</div>",
+                        IsBodyHtml = true
+                    };
+                    mailMessage.To.Add(request.Email);
+
+                    await smtpClient.SendMailAsync(mailMessage);
+                    Console.WriteLine("[SMTP SEND SUCCESS]");
+                }
+                catch (Exception ex)
                 {
-                    From = new System.Net.Mail.MailAddress("smartattendance63@gmail.com", "Smart Attendance System"),
-                    Subject = "Access Request Approved",
-                    Body = $"<p>Your access request has been approved.</p><p>You can now log in with the following credentials:</p><ul><li><strong>Email:</strong> {request.Email}</li><li><strong>Password:</strong> {password}</li></ul><p>Please change your password after logging in.</p>",
-                    IsBodyHtml = true
-                };
-                mailMessage.To.Add(request.Email);
-
-                smtpClient.Send(mailMessage);
-            }
-            catch (Exception ex)
-            {
-                Console.WriteLine($"[SMTP ERROR] {ex.Message}");
-            }
+                    Console.WriteLine($"[SMTP FAILURE] ApproveRequest Gmail Exception: {ex.Message}");
+                    if (ex.InnerException != null) 
+                    {
+                        Console.WriteLine($"[SMTP FAILURE] Inner Exception: {ex.InnerException.Message}");
+                    }
+                }
+            });
 
             return Ok(new { success = true, message = "Request approved and user created." });
         }

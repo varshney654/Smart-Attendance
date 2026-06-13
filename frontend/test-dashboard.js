@@ -1,3 +1,4 @@
+/* global require */
 const axios = require('axios');
 
 async function test() {

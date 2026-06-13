@@ -33,8 +33,8 @@ const ManageUsers = () => {
     try {
       const res = await api.get('/users');
       setUsers(res.data);
-    } catch (err) {
-      console.error(err);
+    } catch {
+      console.error('Failed to fetch users');
     } finally {
       setLoading(false);
     }
@@ -78,7 +78,7 @@ const ManageUsers = () => {
       try {
         await api.delete(`/users/${id}`);
         fetchUsers();
-      } catch (err) {
+      } catch {
         alert('Failed to delete user');
       }
     }

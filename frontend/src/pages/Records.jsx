@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useContext, useRef } from 'react';
+import React, { useState, useEffect, useContext, useRef, useCallback } from 'react';
 import api from '../utils/api';
 import { Download, Search, Filter, Calendar, Plus, Edit, Trash2, MapPin, ChevronDown, Loader2 } from 'lucide-react';
 import { AuthContext } from '../context/AuthContext';
@@ -31,22 +31,6 @@ const Records = () => {
     status: 'Present'
   });
 
-  useEffect(() => {
-    fetchRecords();
-    if (isAdmin) fetchUsers();
-  }, [status, dateRange, isAdmin]);
-
-  // Click outside listener for search combobox
-  useEffect(() => {
-    const handleClickOutside = (event) => {
-      if (searchInputRef.current && !searchInputRef.current.contains(event.target)) {
-        setShowSuggestions(false);
-      }
-    };
-    document.addEventListener('mousedown', handleClickOutside);
-    return () => document.removeEventListener('mousedown', handleClickOutside);
-  }, []);
-
   const fetchUsers = async () => {
     try {
       const res = await api.get('/users');
@@ -56,7 +40,7 @@ const Records = () => {
     }
   };
 
-  const fetchRecords = async () => {
+  const fetchRecords = useCallback(async () => {
     setLoading(true);
     setError(null);
     try {
@@ -76,7 +60,23 @@ const Records = () => {
     } finally {
       setLoading(false);
     }
-  };
+  }, [status, dateRange]);
+
+  useEffect(() => {
+    fetchRecords();
+    if (isAdmin) fetchUsers();
+  }, [status, dateRange, isAdmin, fetchRecords]);
+
+  // Click outside listener for search combobox
+  useEffect(() => {
+    const handleClickOutside = (event) => {
+      if (searchInputRef.current && !searchInputRef.current.contains(event.target)) {
+        setShowSuggestions(false);
+      }
+    };
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, []);
 
   // Safety fallback for records
   const safeRecords = Array.isArray(records) ? records : [];
@@ -363,15 +363,15 @@ const Records = () => {
                       ) : (
                         <span style={{ color: 'var(--text-muted)', fontSize: '0.85rem', fontStyle: 'italic' }}>Unverified</span>
                       )}
-                    </td>
+</td>
                     <td style={{ padding: '1.25rem 1.5rem' }}>
                       {record?.latitude && record?.longitude ? (
-                         <div style={{ display: 'flex', alignItems: 'center', gap: '0.35rem', color: 'var(--text-muted)', fontSize: '0.85rem', backgroundColor: '#f1f5f9', padding: '0.4rem 0.6rem', borderRadius: '0.5rem', display: 'inline-flex' }}>
+                         <div style={{ display: 'inline-flex', alignItems: 'center', gap: '0.35rem', color: 'var(--text-muted)', fontSize: '0.85rem', backgroundColor: '#f1f5f9', padding: '0.4rem 0.6rem', borderRadius: '0.5rem' }}>
                            <MapPin size={14} color="var(--primary)" />
                            {record.latitude.toFixed(4)}, {record.longitude.toFixed(4)}
                          </div>
                       ) : (
-                         <span style={{ color: 'var(--text-muted)', fontSize: '0.85rem' }}>Data Obfuscated</span>
+                        <span style={{ color: 'var(--text-muted)', fontSize: '0.85rem' }}>Data Obfuscated</span>
                       )}
                     </td>
                     {isAdmin && (

@@ -21,14 +21,14 @@ const Alerts = () => {
     }
   };
 
-  const acknowledgeAlert = async (id) => {
-    try {
-      await api.put(`/alerts/${id}/acknowledge`);
-      setAlerts(alerts.map(a => a.id === id ? { ...a, status: 'Acknowledged' } : a));
-    } catch (err) {
-      alert('Failed to acknowledge alert');
-    }
-  };
+const acknowledgeAlert = async (id) => {
+     try {
+       await api.put(`/alerts/${id}/acknowledge`);
+       setAlerts(alerts.map(a => a.id === id ? { ...a, status: 'Acknowledged' } : a));
+     } catch {
+       alert('Failed to acknowledge alert');
+     }
+   };
 
   const unacknowledgedCount = alerts.filter(a => a.status === 'Unacknowledged').length;
 

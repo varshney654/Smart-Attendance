@@ -1,8 +1,10 @@
-import React, { createContext, useState, useEffect } from 'react';
+/* eslint-disable react-refresh/only-export-components */
+/* eslint-disable react-hooks/set-state-in-effect */
+import React, { createContext, useState, useEffect, useMemo } from 'react';
 
 export const AuthContext = createContext();
 
-export const AuthProvider = ({ children }) => {
+function useLocalStorageUser() {
   const [user, setUser] = useState(null);
   const [loading, setLoading] = useState(true);
 
@@ -19,22 +21,30 @@ export const AuthProvider = ({ children }) => {
     setLoading(false);
   }, []);
 
-  const login = (userData, token) => {
-    localStorage.setItem('user', JSON.stringify(userData));
-    localStorage.setItem('token', token);
-    setUser(userData);
-  };
+  return { user, setUser, loading };
+}
 
-  const logout = () => {
-    localStorage.removeItem('user');
-    localStorage.removeItem('token');
-    setUser(null);
-  };
+export const AuthProvider = ({ children }) => {
+  const { user, setUser, loading } = useLocalStorageUser();
+  
+  const value = useMemo(() => ({
+    user,
+    login: (userData, token) => {
+      localStorage.setItem('user', JSON.stringify(userData));
+      localStorage.setItem('token', token);
+      setUser(userData);
+    },
+    logout: () => {
+      localStorage.removeItem('user');
+      localStorage.removeItem('token');
+      setUser(null);
+    }
+  }), [user, setUser]);
 
   if (loading) return <div style={{display:'flex', justifyContent:'center', alignItems:'center', height:'100vh'}}>Loading...</div>;
 
   return (
-    <AuthContext.Provider value={{ user, login, logout }}>
+    <AuthContext.Provider value={value}>
       {children}
     </AuthContext.Provider>
   );

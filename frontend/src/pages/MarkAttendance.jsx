@@ -30,30 +30,30 @@ const MarkAttendance = () => {
       return;
     }
 
-    navigator.geolocation.getCurrentPosition(
-      async (position) => {
-        const { latitude, longitude } = position.coords;
-        setCoords({ latitude, longitude });
-        
-        try {
-          const response = await fetch(`https://nominatim.openstreetmap.org/reverse?format=json&lat=${latitude}&lon=${longitude}`);
-          const data = await response.json();
-          if (data && data.address) {
-            const city = data.address.city || data.address.town || data.address.village || data.address.county || "";
-            const formatted = city ? city : "Unknown Region";
-            setLocationStatus(`${latitude.toFixed(4)}, ${longitude.toFixed(4)} (${formatted})`);
-          } else {
-             setLocationStatus(`${latitude.toFixed(4)}, ${longitude.toFixed(4)}`);
-          }
-        } catch (e) {
-          setLocationStatus(`${latitude.toFixed(4)}, ${longitude.toFixed(4)}`);
-        }
-      },
-      (error) => {
-        setLocationStatus('Location hidden (Permission denied)');
-      },
-      { enableHighAccuracy: true, timeout: 10000, maximumAge: 0 }
-    );
+navigator.geolocation.getCurrentPosition(
+       async (position) => {
+         const { latitude, longitude } = position.coords;
+         setCoords({ latitude, longitude });
+         
+         try {
+           const response = await fetch(`https://nominatim.openstreetmap.org/reverse?format=json&lat=${latitude}&lon=${longitude}`);
+           const data = await response.json();
+           if (data && data.address) {
+             const city = data.address.city || data.address.town || data.address.village || data.address.county || "";
+             const formatted = city ? city : "Unknown Region";
+             setLocationStatus(`${latitude.toFixed(4)}, ${longitude.toFixed(4)} (${formatted})`);
+           } else {
+              setLocationStatus(`${latitude.toFixed(4)}, ${longitude.toFixed(4)}`);
+           }
+         } catch {
+           setLocationStatus(`${latitude.toFixed(4)}, ${longitude.toFixed(4)}`);
+         }
+       },
+       () => {
+         setLocationStatus('Location hidden (Permission denied)');
+       },
+       { enableHighAccuracy: true, timeout: 10000, maximumAge: 0 }
+     );
   }, []);
 
   useEffect(() => {
@@ -188,17 +188,17 @@ const MarkAttendance = () => {
             if (consecutiveMatches >= 2) {
               if (animationFrameRef.current) clearTimeout(animationFrameRef.current);
               
-              setAiMessage('Securely marking attendance...');
-              try {
-                const res = await api.post('/attendance/mark', {
-                  userId: targetUser.userId,
-                  method: 'AI',
-                  confidence: parseFloat(conf.toFixed(0)),
-                  faceDescriptor: currentDescriptor,
-                  isLive: true,
-                  latitude: coords?.latitude,
-                  longitude: coords?.longitude
-                });
+setAiMessage('Securely marking attendance...');
+               try {
+                 await api.post('/attendance/mark', {
+                   userId: targetUser.userId,
+                   method: 'AI',
+                   confidence: parseFloat(conf.toFixed(0)),
+                   faceDescriptor: currentDescriptor,
+                   isLive: true,
+                   latitude: coords?.latitude,
+                   longitude: coords?.longitude
+                 });
                 
                 setAiMessage('Attendance Marked'); // Final success text
                 setCurrentStep(4);
@@ -230,7 +230,7 @@ const MarkAttendance = () => {
       detectAndVerify();
     }, 1500);
 
-  }, [modelsLoaded, registeredFaces, selectedUser, coords]);
+  }, [registeredFaces, selectedUser, coords, currentStep]);
 
   const steps = [
     { id: 1, label: 'Start Camera', icon: <Camera size={20} /> },

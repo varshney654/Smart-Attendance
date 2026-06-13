@@ -3,6 +3,7 @@ using Microsoft.AspNetCore.Mvc;
 using MongoDB.Driver;
 using SmartAttendance.API.Models;
 using SmartAttendance.API.Services;
+using SmartAttendance.API.Data;
 
 namespace SmartAttendance.API.Controllers
 {
@@ -12,10 +13,12 @@ namespace SmartAttendance.API.Controllers
     public class UsersController : ControllerBase
     {
         private readonly MongoDbService _mongoService;
+        private readonly PrismaDbContext _db;
 
-        public UsersController(MongoDbService mongoService)
+        public UsersController(MongoDbService mongoService, PrismaDbContext db)
         {
             _mongoService = mongoService;
+            _db = db;
         }
 
         [HttpGet]
@@ -88,10 +91,46 @@ namespace SmartAttendance.API.Controllers
         [HttpDelete("{id}")]
         public async Task<IActionResult> DeleteUser(string id)
         {
-            var result = await _mongoService.Users.DeleteOneAsync(u => u.Id == id);
-            if (result.DeletedCount == 0) return NotFound(new { message = "User not found" });
+            var user = await _mongoService.Users.Find(u => u.Id == id).FirstOrDefaultAsync();
+            if (user == null) return NotFound(new { message = "User not found" });
 
-            return NoContent();
+            Console.WriteLine($"[CLEANUP] Starting data cleanup for deleted user: {user.Email} (ID: {id})");
+
+            try
+            {
+                // 1 & 2 & 3. Delete user document (which also physically deletes Face Registration Data and Face Descriptors)
+                var result = await _mongoService.Users.DeleteOneAsync(u => u.Id == id);
+                Console.WriteLine($"[CLEANUP] User document deleted. Result: {result.DeletedCount > 0}");
+
+                // 4. Delete all attendance records
+                var attendanceResult = await _mongoService.Attendances.DeleteManyAsync(a => a.UserId == id);
+                Console.WriteLine($"[CLEANUP] Deleted {attendanceResult.DeletedCount} attendance records.");
+
+                // 5. Delete all alerts/notifications
+                var alertsResult = await _mongoService.Alerts.DeleteManyAsync(a => a.UserId == id);
+                Console.WriteLine($"[CLEANUP] Deleted {alertsResult.DeletedCount} alerts/notifications.");
+
+                // 6. Delete associated access requests so they can apply again
+                var accessRequests = await _db.AccessRequests.FindManyAsync(r => r.Email == user.Email);
+                int accessReqDeleted = 0;
+                foreach (var req in accessRequests)
+                {
+                    if (req.Id != null) 
+                    {
+                        await _db.AccessRequests.DeleteAsync(req.Id);
+                        accessReqDeleted++;
+                    }
+                }
+                Console.WriteLine($"[CLEANUP] Deleted {accessReqDeleted} access requests for email {user.Email}.");
+                Console.WriteLine($"[CLEANUP] User {user.Email} completely expunged from the system.");
+                
+                return NoContent();
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine($"[CLEANUP ERROR] Failed to clean up user data: {ex.Message}");
+                return StatusCode(500, new { message = "Failed to clean up user data completely." });
+            }
         }
     }
 }

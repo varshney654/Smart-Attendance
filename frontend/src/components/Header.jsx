@@ -3,7 +3,7 @@ import { AuthContext } from '../context/AuthContext';
 import { LogOut } from 'lucide-react';
 
 const Header = () => {
-  const { user, logout } = useContext(AuthContext);
+  const { logout } = useContext(AuthContext);
 
   return (
     <header style={{

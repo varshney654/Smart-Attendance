@@ -28,7 +28,7 @@ const RegisterFace = () => {
     try {
       const res = await api.get('/users');
       setUsers(res.data);
-    } catch (err) {
+    } catch {
       setStatus({ message: 'Failed to fetch users.', type: 'error' });
     } finally {
       setLoading(false);
@@ -60,9 +60,9 @@ const RegisterFace = () => {
         streamRef.current = stream;
         videoRef.current.play();
         setCameraActive(true);
+        setStatus({ message: 'Camera started. Ensure good lighting and click Capture.', type: 'info' });
       }
-      setStatus({ message: 'Camera started. Ensure good lighting and click Capture.', type: 'info' });
-    } catch (err) {
+    } catch {
       setStatus({ message: 'Failed to access webcam.', type: 'error' });
     }
   };
