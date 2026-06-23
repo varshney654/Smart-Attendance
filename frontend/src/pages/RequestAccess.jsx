@@ -1,7 +1,8 @@
 import React, { useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import api from '../utils/api';
-import { UserPlus, Mail, User, Briefcase, GraduationCap, ArrowLeft, CheckCircle, XCircle } from 'lucide-react';
+import { UserPlus, Mail, User, Briefcase, GraduationCap, CheckCircle, XCircle } from 'lucide-react';
+import '../components/LoginIntro.css';
 
 const RequestAccess = () => {
   const navigate = useNavigate();
@@ -27,8 +28,8 @@ const RequestAccess = () => {
     }
 
     try {
-      const res = await api.post('/request-access', { name, email, role });
-      setStatus({ message: res.data.message || 'Request submitted successfully', type: 'success' });
+      const res = await api.post('/request-access', { name, email, role }, { timeout: 20000 });
+      setStatus({ message: res.data.message || 'Your account has been created successfully. Login credentials have been sent to your email.', type: 'success' });
       setTimeout(() => {
         navigate('/login');
       }, 3000);
@@ -40,30 +41,23 @@ const RequestAccess = () => {
   };
 
   return (
-    <div style={{
-      minHeight: '100vh',
-      display: 'flex',
-      alignItems: 'center',
-      justifyContent: 'center',
-      background: 'linear-gradient(135deg, #f0f4ff 0%, #e0e7ff 100%)',
-      padding: '1rem'
-    }}>
-      <div className="card glass animate-fade-in" style={{ width: '100%', maxWidth: '420px', padding: '2.5rem' }}>
+    <div style={{ minHeight: '100vh', width: '100%', background: '#0f151f', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '1rem' }}>
+      <div className="card glass animate-fade-in dark-glass-card" style={{ width: '100%', maxWidth: '420px', padding: '2.5rem' }}>
         <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', marginBottom: '2rem' }}>
           <div style={{
-            background: 'linear-gradient(135deg, var(--primary), var(--secondary))',
+            background: 'linear-gradient(135deg, #22c55e, #16a34a)',
             color: 'white',
             padding: '1rem',
             borderRadius: '1rem',
             marginBottom: '1rem',
-            boxShadow: 'var(--shadow-lg)'
+            boxShadow: '0 0 15px rgba(34, 197, 94, 0.4)'
           }}>
             <UserPlus size={32} />
           </div>
-          <h2 style={{ fontSize: '1.5rem', textAlign: 'center', color: 'var(--text-main)', margin: 0 }}>
+          <h2 className="dark-text" style={{ fontSize: '1.75rem', fontWeight: 700, textAlign: 'center', margin: 0 }}>
             Request Access
           </h2>
-          <p style={{ color: 'var(--text-muted)', margin: '0.25rem 0 0', textAlign: 'center' }}>
+          <p className="dark-text-muted" style={{ margin: '0.5rem 0 0', fontSize: '0.9rem', fontWeight: 500 }}>
             Submit your details to request an account
           </p>
         </div>
@@ -71,8 +65,8 @@ const RequestAccess = () => {
         {status.message && (
           <div className="animate-fade-in" style={{
             backgroundColor: status.type === 'error' ? 'rgba(239, 68, 68, 0.1)' : 'rgba(16, 185, 129, 0.1)',
-            color: status.type === 'error' ? 'var(--danger)' : 'var(--success)',
-            border: `1px solid ${status.type === 'error' ? 'rgba(239, 68, 68, 0.2)' : 'rgba(16, 185, 129, 0.2)'}`,
+            color: status.type === 'error' ? '#ef4444' : '#22c55e',
+            border: `1px solid ${status.type === 'error' ? 'rgba(239, 68, 68, 0.2)' : 'rgba(34, 197, 94, 0.2)'}`,
             padding: '0.75rem',
             borderRadius: '0.5rem',
             marginBottom: '1.5rem',
@@ -90,18 +84,16 @@ const RequestAccess = () => {
 
         <form onSubmit={handleSubmit}>
           <div style={{ marginBottom: '1.5rem' }}>
-            <label className="input-label" style={{ textAlign: 'center', display: 'block' }}>Select Role</label>
-            <div style={{
+            <label className="input-label dark-text" style={{ textAlign: 'center', display: 'block' }}>Select Role</label>
+            <div className="dark-role-selector" style={{
               display: 'flex',
-              backgroundColor: 'rgba(255, 255, 255, 0.5)',
-              border: '1px solid var(--border)',
               borderRadius: '0.75rem',
-              padding: '0.25rem',
-              gap: '0.25rem'
+              marginTop: '0.5rem'
             }}>
               <button
                 type="button"
                 onClick={() => handleRoleChange('Employee')}
+                className={role === 'Employee' ? 'dark-role-btn-active' : 'dark-role-btn-inactive'}
                 style={{
                   flex: 1,
                   display: 'flex',
@@ -115,9 +107,7 @@ const RequestAccess = () => {
                   fontWeight: 500,
                   cursor: 'pointer',
                   transition: 'all 0.2s ease',
-                  backgroundColor: role === 'Employee' ? 'white' : 'transparent',
-                  color: role === 'Employee' ? 'var(--primary)' : 'var(--text-muted)',
-                  boxShadow: role === 'Employee' ? '0 2px 4px rgba(0,0,0,0.05)' : 'none'
+                  backgroundColor: 'transparent'
                 }}
               >
                 <Briefcase size={16} /> Employee
@@ -125,6 +115,7 @@ const RequestAccess = () => {
               <button
                 type="button"
                 onClick={() => handleRoleChange('Student')}
+                className={role === 'Student' ? 'dark-role-btn-active' : 'dark-role-btn-inactive'}
                 style={{
                   flex: 1,
                   display: 'flex',
@@ -138,9 +129,7 @@ const RequestAccess = () => {
                   fontWeight: 500,
                   cursor: 'pointer',
                   transition: 'all 0.2s ease',
-                  backgroundColor: role === 'Student' ? 'white' : 'transparent',
-                  color: role === 'Student' ? 'var(--primary)' : 'var(--text-muted)',
-                  boxShadow: role === 'Student' ? '0 2px 4px rgba(0,0,0,0.05)' : 'none'
+                  backgroundColor: 'transparent'
                 }}
               >
                 <GraduationCap size={16} /> Student
@@ -149,13 +138,13 @@ const RequestAccess = () => {
           </div>
 
           <div className="input-group" style={{ marginBottom: '1rem' }}>
-            <label className="input-label" htmlFor="name">Full Name</label>
+            <label className="input-label dark-text" htmlFor="name">Full Name</label>
             <div style={{ position: 'relative' }}>
-              <User size={18} style={{ position: 'absolute', left: '0.75rem', top: '50%', transform: 'translateY(-50%)', color: 'var(--text-muted)' }} />
+              <User size={18} style={{ position: 'absolute', left: '0.75rem', top: '50%', transform: 'translateY(-50%)', color: 'rgba(255,255,255,0.4)' }} />
               <input
                 id="name"
                 type="text"
-                className="input-field"
+                className="input-field dark-input-field"
                 style={{ paddingLeft: '2.5rem' }}
                 placeholder="John Doe"
                 value={name}
@@ -166,13 +155,13 @@ const RequestAccess = () => {
           </div>
 
           <div className="input-group" style={{ marginBottom: '1.5rem' }}>
-            <label className="input-label" htmlFor="email">Email Address</label>
+            <label className="input-label dark-text" htmlFor="email">Email Address</label>
             <div style={{ position: 'relative' }}>
-              <Mail size={18} style={{ position: 'absolute', left: '0.75rem', top: '50%', transform: 'translateY(-50%)', color: 'var(--text-muted)' }} />
+              <Mail size={18} style={{ position: 'absolute', left: '0.75rem', top: '50%', transform: 'translateY(-50%)', color: 'rgba(255,255,255,0.4)' }} />
               <input
                 id="email"
                 type="email"
-                className="input-field"
+                className="input-field dark-input-field"
                 style={{ paddingLeft: '2.5rem' }}
                 placeholder="user@example.com"
                 value={email}
@@ -184,18 +173,18 @@ const RequestAccess = () => {
 
           <button
             type="submit"
-            className="btn btn-primary"
-            style={{ width: '100%', padding: '0.875rem', fontSize: '1rem', marginBottom: '0.5rem' }}
+            className="btn green-submit-btn"
+            style={{ width: '100%', padding: '0.875rem', fontSize: '1rem', marginTop: '1rem' }}
             disabled={loading}
           >
             {loading ? 'Submitting...' : 'Submit Request'}
           </button>
         </form>
 
-        <div style={{ textAlign: 'center', marginTop: '1.5rem', paddingTop: '1.5rem', borderTop: '1px solid var(--border)' }}>
-          <span style={{ color: 'var(--text-muted)', fontSize: '0.875rem' }}>
+        <div style={{ textAlign: 'center', marginTop: '1.5rem', paddingTop: '1.5rem', borderTop: '1px solid rgba(255,255,255,0.1)' }}>
+          <span className="dark-text-muted" style={{ fontSize: '0.875rem' }}>
             Already have an account?{' '}
-            <Link to="/login" style={{ color: 'var(--primary)', textDecoration: 'none', fontWeight: 500 }}>
+            <Link to="/login" style={{ color: '#22c55e', textDecoration: 'none', fontWeight: 500 }}>
               Sign In
             </Link>
           </span>

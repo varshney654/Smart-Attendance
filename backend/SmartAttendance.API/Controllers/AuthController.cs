@@ -90,6 +90,7 @@ namespace SmartAttendance.API.Controllers
             user.FaceData = new List<double[]>();
 
             Console.WriteLine($"[RESPONSE SENT] Total Time: {stopwatch.ElapsedMilliseconds}ms");
+            Console.WriteLine($"[LOGIN SUCCESS] User {loginDto.Email} logged in successfully");
 
             return Ok(new
             {
@@ -118,47 +119,49 @@ namespace SmartAttendance.API.Controllers
                 await _users.UpdateAsync(user.Id, user);
             }
 
-            try
+            // Run email in background to avoid blocking the API response
+            _ = Task.Run(async () =>
             {
-                Console.WriteLine($"[DEBUG] Generated OTP for {request.Email}: {otp}");
-                var smtpEmail = Environment.GetEnvironmentVariable("SMTP_EMAIL") ?? "rajeevgupta2429@gmail.com";
-                var smtpPassword = Environment.GetEnvironmentVariable("SMTP_APP_PASSWORD") ?? "dzcetjdsnxcqrutjye";
-
-                Console.WriteLine("[SMTP CONNECTED]");
-                using var smtpClient = new System.Net.Mail.SmtpClient("smtp.gmail.com", 587)
+                try
                 {
-                    EnableSsl = true,
-                    UseDefaultCredentials = false,
-                    Credentials = new System.Net.NetworkCredential(smtpEmail, smtpPassword)
-                };
+                    Console.WriteLine($"[DEBUG] Generated OTP for {request.Email}: {otp}");
+                    var smtpEmail = Environment.GetEnvironmentVariable("SMTP_EMAIL") ?? "smartattendance88@gmail.com";
+                    var smtpPassword = Environment.GetEnvironmentVariable("SMTP_APP_PASSWORD") ?? "bmvi jgsv njlj udmb";
 
-                Console.WriteLine("[SMTP AUTH SUCCESS]");
+                    Console.WriteLine("[SMTP CONNECTED]");
+                    using var smtpClient = new System.Net.Mail.SmtpClient("smtp.gmail.com", 587)
+                    {
+                        EnableSsl = true,
+                        UseDefaultCredentials = false,
+                        Credentials = new System.Net.NetworkCredential(smtpEmail, smtpPassword)
+                    };
 
-                var mailMessage = new System.Net.Mail.MailMessage
-                {
-                    From = new System.Net.Mail.MailAddress(smtpEmail, "Smart Attendance System"),
-                    Subject = "Password Reset OTP",
-                    Body = $"<p>Your password reset code is: <strong>{otp}</strong></p><p>This code will expire securely in exactly 10 minutes.</p>",
-                    IsBodyHtml = true
-                };
-                mailMessage.To.Add(request.Email);
+                    Console.WriteLine("[SMTP AUTH SUCCESS]");
 
-                smtpClient.Send(mailMessage);
-                Console.WriteLine("[SMTP SEND SUCCESS]");
-                
-                return Ok(new { success = true, message = "OTP sent to your email" });
-            }
-            catch (Exception ex)
-            {
-                Console.WriteLine($"[SMTP FAILURE] Gmail Rejection Reason: {ex.Message}");
-                if (ex.InnerException != null) 
-                {
-                    Console.WriteLine($"[SMTP FAILURE] Inner Exception: {ex.InnerException.Message}");
+                    var mailMessage = new System.Net.Mail.MailMessage
+                    {
+                        From = new System.Net.Mail.MailAddress(smtpEmail, "Smart Attendance System"),
+                        Subject = "Password Reset OTP",
+                        Body = $"<p>Your password reset code is: <strong>{otp}</strong></p><p>This code will expire securely in exactly 10 minutes.</p>",
+                        IsBodyHtml = true
+                    };
+                    mailMessage.To.Add(request.Email);
+
+                    await smtpClient.SendMailAsync(mailMessage);
+                    Console.WriteLine("[SMTP SEND SUCCESS]");
                 }
-                Console.WriteLine($"[SMTP FAILURE] Stack Trace: {ex.StackTrace}");
-                
-                return StatusCode(500, new { success = false, message = "Failed to send OTP email" });
-            }
+                catch (Exception ex)
+                {
+                    Console.WriteLine($"[SMTP FAILURE] SendResetCode Gmail Exception: {ex.Message}");
+                    if (ex.InnerException != null) 
+                    {
+                        Console.WriteLine($"[SMTP FAILURE] Inner Exception: {ex.InnerException.Message}");
+                    }
+                    Console.WriteLine($"[SMTP FAILURE] Stack Trace: {ex.StackTrace}");
+                }
+            });
+
+            return Ok(new { success = true, message = "OTP sent to your email" });
         }
 
         [HttpPost("reset-password")]
@@ -192,6 +195,7 @@ namespace SmartAttendance.API.Controllers
         [HttpPost("/api/request-access")]
         public async Task<IActionResult> RequestAccess([FromBody] RequestAccessDto request)
         {
+            Console.WriteLine("[REQUEST RECEIVED]");
             try
             {
                 var existingUser = await _users.FindByEmailAsync(request.Email);
@@ -203,8 +207,9 @@ namespace SmartAttendance.API.Controllers
                 // Generate random password
                 var randomDigits = new Random().Next(1000, 9999);
                 var password = $"User@{randomDigits}";
+                Console.WriteLine($"[PASSWORD GENERATED] Password: {password}");
 
-                // 1. Create User
+                // Create User
                 var user = new User
                 {
                     Name = request.Name,
@@ -213,84 +218,149 @@ namespace SmartAttendance.API.Controllers
                     Password = BCrypt.Net.BCrypt.HashPassword(password)
                 };
                 await _users.CreateAsync(user);
-                Console.WriteLine($"[DB SUCCESS] User {request.Email} created successfully.");
+                Console.WriteLine("[USER CREATED]");
 
-                // 2. Create AccessRequest (Auto-Approved)
+                // Create AccessRequest (Auto Approved)
                 var accessRequest = new AccessRequest
                 {
                     Name = request.Name,
                     Email = request.Email,
                     Role = request.Role,
-                    Status = "Approved"
+                    Status = "Auto Approved"
                 };
                 await _db.AccessRequests.CreateAsync(accessRequest);
 
-                // 3. Email Sending Logic
-                bool emailSent = true;
+                // Send email synchronously to catch failures before returning 200 OK
                 try
                 {
-                    var smtpEmail = Environment.GetEnvironmentVariable("SMTP_EMAIL") ?? "rajeevgupta2429@gmail.com";
-                    var smtpPassword = Environment.GetEnvironmentVariable("SMTP_APP_PASSWORD") ?? "dzcetjdsnxcqrutjye";
+                    Console.WriteLine("[CREDENTIAL EMAIL START]");
+                    var smtpEmail = Environment.GetEnvironmentVariable("SMTP_EMAIL") ?? "smartattendance88@gmail.com";
+                    var smtpPassword = Environment.GetEnvironmentVariable("SMTP_APP_PASSWORD") ?? "bmvi jgsv njlj udmb";
 
-                    Console.WriteLine("[SMTP CONNECTED]");
                     using var smtpClient = new System.Net.Mail.SmtpClient("smtp.gmail.com", 587)
                     {
                         EnableSsl = true,
                         UseDefaultCredentials = false,
-                        Credentials = new System.Net.NetworkCredential(smtpEmail, smtpPassword)
+                        Credentials = new System.Net.NetworkCredential(smtpEmail, smtpPassword),
+                        Timeout = 15000 // Enforce a 15-second timeout to prevent infinite hanging
                     };
 
-                    Console.WriteLine("[SMTP AUTH SUCCESS]");
-
-                    var mailMessage = new System.Net.Mail.MailMessage
+                    var userMailMessage = new System.Net.Mail.MailMessage
                     {
                         From = new System.Net.Mail.MailAddress(smtpEmail, "Smart Attendance System"),
-                        Subject = "Your Smart Attendance Account Details",
+                        Subject = "Welcome to Smart Attendance - Your Account is Ready",
                         Body = $@"
-<div style='font-family: Arial, sans-serif; color: #333; line-height: 1.6;'>
-    <div style='text-align: center; margin-bottom: 1.5rem;'>
-        <img src='https://smart-attendance-2-jimq.onrender.com/logo.png' alt='Smart Attendance Logo' style='width: 64px; height: 64px; margin-bottom: 0.5rem;' />
-        <h2 style='margin: 0; color: #1e293b;'>Smart Attendance</h2>
-        <p style='margin: 0; color: #64748b; font-size: 0.9rem;'>Your Digital Attendance System</p>
+<div style='font-family: ""Segoe UI"", Tahoma, Geneva, Verdana, sans-serif; background-color: #f8fafc; padding: 2rem 1rem;'>
+    <div style='max-width: 600px; margin: 0 auto; background-color: #ffffff; border-radius: 12px; overflow: hidden; box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06);'>
+        <!-- Header -->
+        <div style='background-color: #0f172a; padding: 2.5rem 2rem; text-align: center;'>
+            <img src='https://smart-attendance-2-jimq.onrender.com/logo.png' alt='Smart Attendance Logo' style='width: 64px; height: 64px; margin-bottom: 1rem;' />
+            <h1 style='color: #ffffff; margin: 0; font-size: 1.5rem; font-weight: 600; letter-spacing: 0.5px;'>Smart Attendance</h1>
+            <p style='color: #94a3b8; margin: 0.5rem 0 0; font-size: 0.95rem;'>AI-Powered Attendance Management</p>
+        </div>
+        
+        <!-- Content -->
+        <div style='padding: 2.5rem 2rem;'>
+            <h2 style='color: #1e293b; margin-top: 0; font-size: 1.25rem;'>Hello {request.Name}, 👋</h2>
+            <p style='color: #475569; line-height: 1.6; font-size: 1rem;'>Welcome to the Smart Attendance System! Your account has been successfully created and is ready to use.</p>
+            
+            <!-- Credentials Box -->
+            <div style='background-color: #f1f5f9; border-left: 4px solid #22c55e; padding: 1.5rem; border-radius: 0 8px 8px 0; margin: 2rem 0;'>
+                <h3 style='margin-top: 0; color: #0f172a; font-size: 1.1rem; margin-bottom: 1.25rem;'>📋 Account Details</h3>
+                <table style='width: 100%; border-collapse: collapse;'>
+                    <tr>
+                        <td style='padding: 0.5rem 0; color: #64748b; width: 100px; font-weight: 500;'>Name:</td>
+                        <td style='padding: 0.5rem 0; color: #0f172a; font-weight: 600;'>{request.Name}</td>
+                    </tr>
+                    <tr>
+                        <td style='padding: 0.5rem 0; color: #64748b; font-weight: 500;'>Role:</td>
+                        <td style='padding: 0.5rem 0;'>
+                            <span style='background-color: #d1fae5; color: #059669; padding: 0.25rem 0.75rem; border-radius: 9999px; font-size: 0.85rem; font-weight: 600;'>{request.Role}</span>
+                        </td>
+                    </tr>
+                    <tr>
+                        <td style='padding: 0.5rem 0; color: #64748b; font-weight: 500;'>Email:</td>
+                        <td style='padding: 0.5rem 0; color: #0f172a; font-weight: 600;'>{request.Email}</td>
+                    </tr>
+                    <tr>
+                        <td style='padding: 0.5rem 0; color: #64748b; font-weight: 500;'>Password:</td>
+                        <td style='padding: 0.5rem 0;'>
+                            <span style='color: #0f172a; font-weight: 600; letter-spacing: 1px; background-color: #e2e8f0; padding: 0.25rem 0.5rem; border-radius: 4px;'>{password}</span>
+                        </td>
+                    </tr>
+                </table>
+            </div>
+            
+            <!-- CTA Button -->
+            <div style='text-align: center; margin: 2.5rem 0;'>
+                <a href='https://smart-attendance-2-jimq.onrender.com/login' style='background-color: #22c55e; color: #ffffff; padding: 14px 32px; text-decoration: none; border-radius: 8px; font-weight: 600; font-size: 1.05rem; display: inline-block; box-shadow: 0 4px 6px -1px rgba(34, 197, 94, 0.4);'>
+                    Login Now
+                </a>
+            </div>
+            
+            <!-- Getting Started -->
+            <h3 style='color: #0f172a; font-size: 1.1rem; border-bottom: 2px solid #e2e8f0; padding-bottom: 0.5rem; margin-top: 2.5rem;'>🚀 Getting Started</h3>
+            <ol style='color: #475569; line-height: 1.7; padding-left: 1.5rem; margin-top: 1rem;'>
+                <li style='margin-bottom: 0.5rem;'>Open the login portal using the button above.</li>
+                <li style='margin-bottom: 0.5rem;'>Login using your secure credentials.</li>
+                <li style='margin-bottom: 0.5rem;'>Register your face biometric data after your first login.</li>
+                <li>Start marking your attendance seamlessly.</li>
+            </ol>
+            
+            <!-- Features -->
+            <h3 style='color: #0f172a; font-size: 1.1rem; border-bottom: 2px solid #e2e8f0; padding-bottom: 0.5rem; margin-top: 2rem;'>✨ Features Available</h3>
+            <ul style='color: #475569; line-height: 1.7; padding-left: 0; list-style-type: none; margin-top: 1rem;'>
+                <li style='margin-bottom: 0.5rem;'>✅ Face Recognition Attendance</li>
+                <li style='margin-bottom: 0.5rem;'>✅ Attendance History</li>
+                <li style='margin-bottom: 0.5rem;'>✅ Analytics Dashboard</li>
+                <li style='margin-bottom: 0.5rem;'>✅ Attendance Reports</li>
+                <li>✅ Profile Management</li>
+            </ul>
+
+            <!-- Security Notice -->
+            <div style='background-color: #fffbeb; border: 1px solid #fef3c7; border-left: 4px solid #f59e0b; padding: 1.25rem; border-radius: 0 8px 8px 0; margin: 2.5rem 0;'>
+                <h4 style='margin: 0 0 0.5rem 0; color: #b45309; font-size: 1rem;'>🔒 Security Notice</h4>
+                <ul style='color: #92400e; margin: 0; padding-left: 1.25rem; font-size: 0.9rem; line-height: 1.5;'>
+                    <li style='margin-bottom: 0.25rem;'>This is a temporary system-generated password.</li>
+                    <li style='margin-bottom: 0.25rem;'>Please change your password immediately after your first login.</li>
+                    <li>Do not share your credentials with anyone.</li>
+                </ul>
+            </div>
+            
+            <p style='color: #475569; line-height: 1.6; margin-top: 2.5rem;'>
+                If you face any issues, please contact the system administrator.<br><br>
+                Thank you for using Smart Attendance.<br>
+                <strong style='color: #0f172a;'>Best Regards,<br>Smart Attendance Team</strong>
+            </p>
+        </div>
+        
+        <!-- Footer -->
+        <div style='background-color: #f8fafc; padding: 2rem; text-align: center; border-top: 1px solid #e2e8f0;'>
+            <p style='color: #64748b; margin: 0; font-size: 0.85rem;'>&copy; 2026 Smart Attendance System</p>
+            <p style='color: #94a3b8; margin: 0.25rem 0 0; font-size: 0.8rem;'>AI-Powered Attendance Management Platform</p>
+        </div>
     </div>
-    <p>Hello,</p>
-    <p>Your access request for the Smart Attendance System has been approved ✅</p>
-    <p>Here are your login credentials:</p>
-    <p>
-        <strong>Email:</strong> {request.Email}<br>
-        <strong>Password:</strong> {password}
-    </p>
-    <p>🔐 Please change your password after first login for security purposes.</p>
-    <p>You can login here:<br><a href='https://smart-attendance-2-jimq.onrender.com' style='color: #1a73e8;'>https://smart-attendance-2-jimq.onrender.com</a></p>
-    <p>If you face any issues, feel free to reply to this email.</p>
-    <p>Regards,<br>Smart Attendance Team</p>
 </div>",
                         IsBodyHtml = true
                     };
-                    mailMessage.To.Add(request.Email);
-
-                    smtpClient.Send(mailMessage);
-                    Console.WriteLine("[SMTP SEND SUCCESS]");
+                    userMailMessage.To.Add(request.Email);
+                    
+                    // Send synchronously to enforce Timeout
+                    smtpClient.Send(userMailMessage);
+                    Console.WriteLine("[CREDENTIAL EMAIL SUCCESS]");
                 }
                 catch (Exception ex)
                 {
-                    emailSent = false;
-                    Console.WriteLine($"[SMTP FAILURE] RequestAccess Gmail Exception: {ex.Message}");
+                    Console.WriteLine($"[CREDENTIAL EMAIL FAILURE] RequestAccess Exception: {ex.Message}");
                     if (ex.InnerException != null) 
                     {
                         Console.WriteLine($"[SMTP FAILURE] Inner Exception: {ex.InnerException.Message}");
                     }
+                    return StatusCode(500, new { success = false, message = "User created, but SMTP failed to send credentials: " + ex.Message });
                 }
 
-                // 4. Final API Response
-                if (emailSent)
-                {
-                    return Ok(new { success = true, message = "Account created successfully. Check your email." });
-                }
-                else
-                {
-                    return Ok(new { success = true, message = "Request submitted successfully, but email delivery failed." });
-                }
+                return Ok(new { success = true, message = "Your account has been created successfully. Login credentials have been sent to your email." });
+
             }
             catch (Exception ex)
             {
@@ -334,8 +404,8 @@ namespace SmartAttendance.API.Controllers
             {
                 try
                 {
-                    var smtpEmail = Environment.GetEnvironmentVariable("SMTP_EMAIL") ?? "rajeevgupta2429@gmail.com";
-                    var smtpPassword = Environment.GetEnvironmentVariable("SMTP_APP_PASSWORD") ?? "dzcetjdsnxcqrutjye";
+                    var smtpEmail = Environment.GetEnvironmentVariable("SMTP_EMAIL") ?? "smartattendance88@gmail.com";
+                    var smtpPassword = Environment.GetEnvironmentVariable("SMTP_APP_PASSWORD") ?? "bmvi jgsv njlj udmb";
 
                     Console.WriteLine("[SMTP CONNECTED]");
                     using var smtpClient = new System.Net.Mail.SmtpClient("smtp.gmail.com", 587)

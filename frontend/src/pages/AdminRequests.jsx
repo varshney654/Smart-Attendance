@@ -24,29 +24,7 @@ const AdminRequests = () => {
     }
   };
 
-  const handleApprove = async (id) => {
-    try {
-      setStatus({ message: 'Approving request...', type: 'info' });
-      const res = await api.post(`/approve/${id}`);
-      setStatus({ message: res.data.message || 'Request approved successfully', type: 'success' });
-      fetchRequests();
-    } catch (err) {
-      setStatus({ message: err.response?.data?.message || 'Failed to approve request', type: 'error' });
-    }
-  };
 
-  const handleReject = async (id) => {
-    if (window.confirm('Are you sure you want to reject this request?')) {
-      try {
-        setStatus({ message: 'Rejecting request...', type: 'info' });
-        const res = await api.post(`/reject/${id}`);
-        setStatus({ message: res.data.message || 'Request rejected', type: 'success' });
-        fetchRequests();
-      } catch (err) {
-        setStatus({ message: err.response?.data?.message || 'Failed to reject request', type: 'error' });
-      }
-    }
-  };
 
   const filteredRequests = requests.filter(req => 
     req.name.toLowerCase().includes(search.toLowerCase()) || 
@@ -107,7 +85,6 @@ const AdminRequests = () => {
                 <th>Email</th>
                 <th>Role</th>
                 <th>Status</th>
-                <th style={{ textAlign: 'right' }}>Actions</th>
               </tr>
             </thead>
             <tbody>
@@ -133,24 +110,11 @@ const AdminRequests = () => {
                       </span>
                     </td>
                     <td>
-                      <span className={`badge ${req.status === 'Pending' ? 'badge-warning' : req.status === 'Approved' ? 'badge-success' : 'badge-danger'}`} style={{ backgroundColor: req.status === 'Pending' ? '#fef3c7' : req.status === 'Approved' ? '#d1fae5' : '#fee2e2', color: req.status === 'Pending' ? '#d97706' : req.status === 'Approved' ? '#059669' : '#dc2626' }}>
+                      <span className="badge badge-success" style={{ backgroundColor: '#d1fae5', color: '#059669' }}>
                         {req.status}
                       </span>
                     </td>
-                    <td style={{ textAlign: 'right' }}>
-                      {req.status === 'Pending' ? (
-                        <div style={{ display: 'flex', gap: '0.5rem', justifyContent: 'flex-end' }}>
-                          <button style={{ color: 'var(--success)', padding: '0.5rem 0.75rem', border: '1px solid var(--success)', borderRadius: '4px', background: 'transparent', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '0.25rem', fontSize: '0.875rem', fontWeight: 500 }} onClick={() => handleApprove(req.id)}>
-                            <Check size={16} /> Approve
-                          </button>
-                          <button style={{ color: 'var(--danger)', padding: '0.5rem 0.75rem', border: '1px solid var(--danger)', borderRadius: '4px', background: 'transparent', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '0.25rem', fontSize: '0.875rem', fontWeight: 500 }} onClick={() => handleReject(req.id)}>
-                            <X size={16} /> Reject
-                          </button>
-                        </div>
-                      ) : (
-                        <span style={{ color: 'var(--text-muted)', fontSize: '0.875rem', paddingRight: '0.5rem' }}>Processed</span>
-                      )}
-                    </td>
+
                   </tr>
                 ))
               )}
