@@ -95,9 +95,9 @@ const Login = () => {
       } else if (response.data.user.role === 'Student') {
         navigate('/mark-attendance');
       } else if (response.data.user.role === 'Employee') {
-        navigate('/employee-dashboard');
+        navigate('/dashboard');
       } else {
-        navigate('/'); // Fallback
+        navigate('/dashboard'); // Fallback
       }
     } catch (err) {
       clearTimeout(timer1);

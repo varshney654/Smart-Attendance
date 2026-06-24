@@ -9,5 +9,6 @@ namespace SmartAttendance.API.DTOs
         public bool IsLive { get; set; } = false;
         public double? Latitude { get; set; }
         public double? Longitude { get; set; }
+        public string? SessionToken { get; set; }
     }
 }

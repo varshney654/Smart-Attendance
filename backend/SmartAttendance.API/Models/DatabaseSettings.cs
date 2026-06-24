@@ -7,5 +7,6 @@ namespace SmartAttendance.API.Models
         public string UsersCollectionName { get; set; } = null!;
         public string AttendanceCollectionName { get; set; } = null!;
         public string AlertsCollectionName { get; set; } = null!;
+        public string AuditLogsCollectionName { get; set; } = null!;
     }
 }

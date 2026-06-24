@@ -9,6 +9,7 @@ namespace SmartAttendance.API.Services
         public readonly IMongoCollection<User> Users;
         public readonly IMongoCollection<Attendance> Attendances;
         public readonly IMongoCollection<Alert> Alerts;
+        public readonly IMongoCollection<AuditLog> AuditLogs;
 
         public MongoDbService(IOptions<DatabaseSettings> databaseSettings, IConfiguration configuration)
         {
@@ -21,6 +22,7 @@ namespace SmartAttendance.API.Services
             Users = mongoDatabase.GetCollection<User>(databaseSettings.Value.UsersCollectionName);
             Attendances = mongoDatabase.GetCollection<Attendance>(databaseSettings.Value.AttendanceCollectionName);
             Alerts = mongoDatabase.GetCollection<Alert>(databaseSettings.Value.AlertsCollectionName);
+            AuditLogs = mongoDatabase.GetCollection<AuditLog>(databaseSettings.Value.AuditLogsCollectionName);
         }
     }
 }

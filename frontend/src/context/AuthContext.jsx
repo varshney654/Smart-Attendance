@@ -11,11 +11,26 @@ function useLocalStorageUser() {
   useEffect(() => {
     const savedUser = localStorage.getItem('user');
     const token = localStorage.getItem('token');
+    
     if (savedUser && token) {
       try {
-        setUser(JSON.parse(savedUser));
+        // Basic JWT validation (check expiry)
+        const payloadBase64 = token.split('.')[1];
+        if (payloadBase64) {
+          const payload = JSON.parse(atob(payloadBase64.replace(/-/g, '+').replace(/_/g, '/')));
+          if (payload.exp && payload.exp * 1000 < Date.now()) {
+            console.log('[AUTH] Token expired, clearing session');
+            localStorage.clear();
+            sessionStorage.clear();
+            setUser(null);
+          } else {
+            setUser(JSON.parse(savedUser));
+          }
+        }
       } catch (e) {
-        console.error("Failed to parse user from local storage", e);
+        console.error("Failed to parse token or user from local storage", e);
+        localStorage.clear();
+        sessionStorage.clear();
       }
     }
     setLoading(false);
@@ -37,7 +52,10 @@ export const AuthProvider = ({ children }) => {
     logout: () => {
       localStorage.removeItem('user');
       localStorage.removeItem('token');
+      localStorage.removeItem('role'); // if any
+      sessionStorage.clear();
       setUser(null);
+      window.location.href = '/login'; // Force redirect and reload state
     }
   }), [user, setUser]);
 

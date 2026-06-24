@@ -9,15 +9,17 @@ import {
   Users, 
   FileBox, 
   BellRing,
-  UserPlus
+  UserPlus,
+  QrCode
 } from 'lucide-react';
 
 const Sidebar = () => {
   const { user } = useContext(AuthContext);
 
   const links = [
-    { to: '/', label: 'Dashboard', icon: <LayoutDashboard size={20} /> },
+    { to: '/dashboard', label: 'Dashboard', icon: <LayoutDashboard size={20} /> },
     { to: '/mark-attendance', label: 'Mark Attendance', icon: <Camera size={20} /> },
+    { to: '/scan-qr', label: 'Scan QR', icon: <QrCode size={20} /> },
     { to: '/records', label: 'Records', icon: <FileText size={20} /> },
     { to: '/analytics', label: 'Analytics', icon: <BarChart2 size={20} /> },
     { to: '/reports', label: 'Reports', icon: <FileBox size={20} /> },
@@ -25,9 +27,10 @@ const Sidebar = () => {
   ];
 
   if (user?.role === 'Admin') {
-    links.splice(4, 0, { to: '/users', label: 'Manage Users', icon: <Users size={20} /> });
-    links.splice(5, 0, { to: '/register-face', label: 'Register Face', icon: <Camera size={20} /> });
-    links.splice(6, 0, { to: '/admin-requests', label: 'Admin Requests', icon: <UserPlus size={20} /> });
+    links.splice(5, 0, { to: '/users', label: 'Manage Users', icon: <Users size={20} /> });
+    links.splice(6, 0, { to: '/register-face', label: 'Register Face', icon: <Camera size={20} /> });
+    links.splice(7, 0, { to: '/generate-qr', label: 'Generate QR', icon: <QrCode size={20} /> });
+    links.splice(8, 0, { to: '/admin-requests', label: 'Admin Requests', icon: <UserPlus size={20} /> });
   }
 
   return (

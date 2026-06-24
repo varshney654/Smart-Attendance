@@ -14,20 +14,9 @@ import Alerts from './pages/Alerts';
 import RegisterFace from './pages/RegisterFace';
 import RequestAccess from './pages/RequestAccess';
 import AdminRequests from './pages/AdminRequests';
-
-const ProtectedRoute = ({ children, roles }) => {
-  const { user } = useContext(AuthContext);
-  
-  if (!user) {
-    return <Navigate to="/login" />;
-  }
-  
-  if (roles && !roles.includes(user.role)) {
-    return <Navigate to="/" />; // Redirect to their default view
-  }
-
-  return children;
-};
+import ProtectedRoute from './components/ProtectedRoute';
+import GenerateQR from './pages/GenerateQR';
+import ScanQR from './pages/ScanQR';
 
 function App() {
   const { user } = useContext(AuthContext);
@@ -39,19 +28,25 @@ function App() {
       <Route path="/request-access" element={user ? <Navigate to="/" /> : <RequestAccess />} />
       
       <Route path="/" element={
+        user ? <Navigate to="/dashboard" replace /> : <Navigate to="/login" replace />
+      } />
+      
+      <Route element={
         <ProtectedRoute>
           <Layout />
         </ProtectedRoute>
       }>
-        <Route index element={<Dashboard />} />
-        <Route path="mark-attendance" element={<MarkAttendance />} />
-        <Route path="records" element={<Records />} />
-        <Route path="analytics" element={<Analytics />} />
-        <Route path="users" element={<ProtectedRoute roles={['Admin']}><ManageUsers /></ProtectedRoute>} />
-        <Route path="register-face" element={<ProtectedRoute roles={['Admin']}><RegisterFace /></ProtectedRoute>} />
-        <Route path="admin-requests" element={<ProtectedRoute roles={['Admin']}><AdminRequests /></ProtectedRoute>} />
-        <Route path="reports" element={<Reports />} />
-        <Route path="alerts" element={<Alerts />} />
+        <Route path="/dashboard" element={<Dashboard />} />
+        <Route path="/mark-attendance" element={<MarkAttendance />} />
+        <Route path="/scan-qr" element={<ScanQR />} />
+        <Route path="/records" element={<Records />} />
+        <Route path="/analytics" element={<Analytics />} />
+        <Route path="/users" element={<ProtectedRoute roles={['Admin']}><ManageUsers /></ProtectedRoute>} />
+        <Route path="/register-face" element={<ProtectedRoute roles={['Admin']}><RegisterFace /></ProtectedRoute>} />
+        <Route path="/generate-qr" element={<ProtectedRoute roles={['Admin']}><GenerateQR /></ProtectedRoute>} />
+        <Route path="/admin-requests" element={<ProtectedRoute roles={['Admin']}><AdminRequests /></ProtectedRoute>} />
+        <Route path="/reports" element={<ProtectedRoute roles={['Admin']}><Reports /></ProtectedRoute>} />
+        <Route path="/alerts" element={<Alerts />} />
       </Route>
       
       <Route path="*" element={<Navigate to="/" />} />

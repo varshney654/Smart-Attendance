@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react';
-import * as faceapi from '@vladmandic/face-api';
 import api from '../utils/api';
 import { Camera, CheckCircle, XCircle, RefreshCw, AlertTriangle } from 'lucide-react';
+import { initMediaPipe, initFaceAPI, getFaceDescriptor } from '../utils/faceUtils';
 
 const RegisterFace = () => {
   const [users, setUsers] = useState([]);
@@ -11,16 +11,19 @@ const RegisterFace = () => {
   const [cameraActive, setCameraActive] = useState(false);
   const [capturing, setCapturing] = useState(false);
   const [status, setStatus] = useState({ message: 'Select a user and start the camera.', type: 'info' });
-  const [progress, setProgress] = useState(0);
 
   const videoRef = useRef(null);
   const streamRef = useRef(null);
+  const faceLandmarkerRef = useRef(null);
+  const animationFrameRef = useRef(null);
+  const [isFaceAligned, setIsFaceAligned] = useState(false);
 
   useEffect(() => {
     fetchUsers();
-    loadModels();
+    loadAI();
     return () => {
       stopCamera();
+      if (animationFrameRef.current) cancelAnimationFrame(animationFrameRef.current);
     };
   }, []);
 
@@ -35,12 +38,11 @@ const RegisterFace = () => {
     }
   };
 
-  const loadModels = async () => {
+  const loadAI = async () => {
     try {
-      setStatus({ message: 'Loading AI models...', type: 'info' });
-      await faceapi.nets.tinyFaceDetector.loadFromUri('/models');
-      await faceapi.nets.faceLandmark68Net.loadFromUri('/models');
-      await faceapi.nets.faceRecognitionNet.loadFromUri('/models');
+      setStatus({ message: 'Loading high-speed AI models...', type: 'info' });
+      faceLandmarkerRef.current = await initMediaPipe();
+      await initFaceAPI();
       setModelsLoaded(true);
       setStatus({ message: 'Models loaded. Ready to start camera.', type: 'success' });
     } catch (err) {
@@ -53,14 +55,17 @@ const RegisterFace = () => {
     if (!modelsLoaded) return;
     try {
       const stream = await navigator.mediaDevices.getUserMedia({ 
-        video: { width: { ideal: 1280 }, height: { ideal: 720 }, facingMode: "user" } 
+        video: { facingMode: "user" } // responsive for mobile
       });
       if (videoRef.current) {
         videoRef.current.srcObject = stream;
         streamRef.current = stream;
         videoRef.current.play();
         setCameraActive(true);
-        setStatus({ message: 'Camera started. Ensure good lighting and click Capture.', type: 'info' });
+        setStatus({ message: 'Look at the camera. Wait for alignment...', type: 'info' });
+        
+        // Start continuous checking for alignment
+        checkAlignment();
       }
     } catch {
       setStatus({ message: 'Failed to access webcam.', type: 'error' });
@@ -69,6 +74,7 @@ const RegisterFace = () => {
 
   const stopCamera = () => {
     setCameraActive(false);
+    setIsFaceAligned(false);
     if (streamRef.current) {
       streamRef.current.getTracks().forEach(t => t.stop());
       streamRef.current = null;
@@ -76,80 +82,79 @@ const RegisterFace = () => {
     if (videoRef.current) {
       videoRef.current.srcObject = null;
     }
+    if (animationFrameRef.current) cancelAnimationFrame(animationFrameRef.current);
+  };
+
+  let lastVideoTime = -1;
+  const checkAlignment = () => {
+    if (!videoRef.current || !faceLandmarkerRef.current || !cameraActive) {
+      animationFrameRef.current = requestAnimationFrame(checkAlignment);
+      return;
+    }
+
+    const videoEl = videoRef.current;
+    
+    if (videoEl.readyState === 4 && videoEl.currentTime !== lastVideoTime) {
+      lastVideoTime = videoEl.currentTime;
+      let startTimeMs = performance.now();
+      const results = faceLandmarkerRef.current.detectForVideo(videoEl, startTimeMs);
+      
+      if (results.faceLandmarks && results.faceLandmarks.length > 0) {
+        // Assume face is visible and somewhat centered. We could add strict bounds checking here.
+        setIsFaceAligned(true);
+        setStatus({ message: 'Face Aligned. You can capture now.', type: 'success' });
+      } else {
+        setIsFaceAligned(false);
+        setStatus({ message: 'Face not visible or too far.', type: 'warning' });
+      }
+    }
+    
+    animationFrameRef.current = requestAnimationFrame(checkAlignment);
   };
 
   const handleCapture = async () => {
-    console.log('[RegisterFace] Capture & Register clicked');
     if (!selectedUserId) {
-      console.log('[RegisterFace] User not selected');
       setStatus({ message: 'Please select a user first.', type: 'error' });
       return;
     }
 
     if (!videoRef.current || !streamRef.current || !cameraActive) {
-      console.log('[RegisterFace] Camera not started');
       setStatus({ message: 'Please start the camera first.', type: 'error' });
       return;
     }
 
-    setCapturing(true);
-    setStatus({ message: 'Extracting face features... Please look at the camera.', type: 'info' });
-    console.log('[RegisterFace] Scanning face...');
-    setProgress(0);
+    if (!isFaceAligned) {
+      setStatus({ message: 'Please align your face before capturing.', type: 'warning' });
+      return;
+    }
 
-    const embeddings = [];
-    const samplesNeeded = 5;
-    let samplesCaptured = 0;
-    let attempts = 0;
-    const maxAttempts = 20;
+    setCapturing(true);
+    setStatus({ message: 'Extracting high-quality biometric features...', type: 'info' });
 
     try {
-      console.log(`[RegisterFace] Detection loop starting. Dimensions: ${videoRef.current.videoWidth}x${videoRef.current.videoHeight}`);
-      const options = new faceapi.TinyFaceDetectorOptions({ inputSize: 416, scoreThreshold: 0.2 });
+      // Get 1 very accurate descriptor
+      const descriptor = await getFaceDescriptor(videoRef.current);
+      
+      if (descriptor) {
+        setStatus({ message: 'Uploading biometric data...', type: 'info' });
+        
+        await api.post('/face/register', {
+          userId: selectedUserId,
+          faceData: [descriptor] // Sending 1 high-quality embedding instead of 5
+        });
 
-      while (samplesCaptured < samplesNeeded && attempts < maxAttempts) {
-        attempts++;
-        await new Promise(r => setTimeout(r, 600)); // slight delay
-
-        const detection = await faceapi.detectSingleFace(videoRef.current, options)
-          .withFaceLandmarks()
-          .withFaceDescriptor();
-
-        if (detection) {
-          samplesCaptured++;
-          console.log(`[RegisterFace] Sample ${samplesCaptured}/${samplesNeeded} captured (Score: ${detection.detection.score})`);
-          embeddings.push(Array.from(detection.descriptor));
-          setProgress((samplesCaptured / samplesNeeded) * 100);
-          setStatus({ message: `Captured sample ${samplesCaptured} of ${samplesNeeded}...`, type: 'info' });
-        } else {
-          console.log(`[RegisterFace] Attempt ${attempts} failed: No face detected`);
-          setStatus({ message: `Searching for face... Ensure good lighting.`, type: 'warning' });
-        }
+        setStatus({ message: 'Face registered successfully! Cache will be updated automatically.', type: 'success' });
+        setTimeout(() => {
+           stopCamera();
+           setSelectedUserId('');
+        }, 1500);
+      } else {
+        setStatus({ message: 'Failed to extract features. Please try again.', type: 'error' });
       }
-
-      if (samplesCaptured < samplesNeeded) {
-        console.log('[RegisterFace] Failed to capture enough samples after 20 attempts.');
-        setStatus({ message: 'Failed to capture consistent samples. Please try again.', type: 'error' });
-        setCapturing(false);
-        return;
-      }
-
-      console.log('[RegisterFace] All samples captured. Sending to API...');
-      setStatus({ message: 'Uploading face embeddings...', type: 'info' });
-
-      await api.post('/face/register', {
-        userId: selectedUserId,
-        faceData: embeddings
-      });
-
-      console.log('[RegisterFace] Registered successfully');
-      setStatus({ message: 'Face registered successfully!', type: 'success' });
-      stopCamera();
     } catch (err) {
-      console.error('[RegisterFace] Error during capture/register:', err);
       setStatus({ message: err.response?.data?.message || 'Error occurred during registration.', type: 'error' });
     } finally {
-      if (samplesCaptured < samplesNeeded) setCapturing(false);
+      setCapturing(false);
     }
   };
 
@@ -157,7 +162,7 @@ const RegisterFace = () => {
     <div style={{ maxWidth: '800px', margin: '0 auto' }}>
       <div style={{ marginBottom: '2rem' }}>
         <h1 style={{ fontSize: '1.875rem', marginBottom: '0.5rem' }}>Register Face</h1>
-        <p style={{ color: 'var(--text-muted)' }}>Enroll a user's face for AI attendance tracking</p>
+        <p style={{ color: 'var(--text-muted)' }}>Enroll a user's face with instant 1-shot capture</p>
       </div>
 
       <div className="card glass animate-fade-in" style={{ padding: '2rem' }}>
@@ -212,12 +217,14 @@ const RegisterFace = () => {
           maxWidth: '640px', 
           margin: '0 auto 1.5rem', 
           aspectRatio: '4/3', 
-          backgroundColor: '#000', 
+          backgroundColor: '#0f172a', 
           borderRadius: '1rem', 
           overflow: 'hidden',
           display: 'flex',
           alignItems: 'center',
-          justifyContent: 'center'
+          justifyContent: 'center',
+          border: isFaceAligned ? '3px solid var(--success)' : '3px solid transparent',
+          transition: 'border 0.3s'
         }}>
           <video 
             ref={videoRef}
@@ -227,18 +234,12 @@ const RegisterFace = () => {
             playsInline
           />
           {!cameraActive && (
-            <div style={{ position: 'absolute', color: '#fff', display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
+            <div style={{ position: 'absolute', color: '#64748b', display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
               <Camera size={48} style={{ opacity: 0.5, marginBottom: '1rem' }} />
               <p>Camera is off</p>
             </div>
           )}
         </div>
-
-        {capturing && (
-          <div style={{ marginBottom: '1.5rem', height: '8px', backgroundColor: 'var(--border)', borderRadius: '4px', overflow: 'hidden' }}>
-            <div style={{ height: '100%', width: `${progress}%`, backgroundColor: 'var(--primary)', transition: 'width 0.3s' }}></div>
-          </div>
-        )}
 
         <div style={{ display: 'flex', gap: '1rem', justifyContent: 'center' }}>
           {!cameraActive ? (
@@ -263,7 +264,7 @@ const RegisterFace = () => {
               </button>
               <button 
                 onClick={handleCapture}
-                disabled={capturing || !selectedUserId || !modelsLoaded}
+                disabled={capturing || !selectedUserId || !modelsLoaded || !isFaceAligned}
                 className="btn btn-primary"
                 style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}
               >

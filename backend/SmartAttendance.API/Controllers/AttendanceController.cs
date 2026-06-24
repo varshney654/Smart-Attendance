@@ -283,6 +283,9 @@ namespace SmartAttendance.API.Controllers
             try
             {
                 var targetDate = DateTime.SpecifyKind(dto.Date.Date, DateTimeKind.Utc);
+                // Fallback if frontend sends default dates
+                if (targetDate.Year < 2000) targetDate = DateTime.UtcNow.Date;
+
                 var endOfDay = targetDate.AddDays(1);
                 var existingRecord = await _mongoService.Attendances
                     .Find(a => a.UserId == dto.UserId && a.Date >= targetDate && a.Date < endOfDay)
@@ -290,21 +293,43 @@ namespace SmartAttendance.API.Controllers
 
                 if (existingRecord != null)
                 {
-                    return BadRequest(new { success = false, message = "Attendance already marked for this user on this date." });
+                    return BadRequest(new { success = false, message = "Attendance already marked for today." });
                 }
 
                 var attendance = new Attendance
                 {
                     UserId = dto.UserId,
                     Date = targetDate,
-                    Time = dto.Time,
+                    Time = string.IsNullOrEmpty(dto.Time) ? DateTime.Now.ToString("HH:mm:ss") : dto.Time,
                     Method = "Manual",
                     Confidence = null,
                     Status = dto.Status
                 };
 
                 await _mongoService.Attendances.InsertOneAsync(attendance);
-                return Ok(new { success = true, message = "Manual attendance added successfully." });
+
+                // Audit Logging
+                var adminId = User.FindFirst(System.Security.Claims.ClaimTypes.NameIdentifier)?.Value 
+                           ?? User.FindFirst("id")?.Value 
+                           ?? User.FindFirst("sub")?.Value ?? "UnknownAdmin";
+                           
+                var adminName = User.FindFirst("name")?.Value ?? "Admin";
+                var targetUser = await _mongoService.Users.Find(u => u.Id == dto.UserId).FirstOrDefaultAsync();
+
+                var auditLog = new AuditLog
+                {
+                    AdminId = adminId,
+                    AdminName = adminName,
+                    UserId = dto.UserId,
+                    UserName = targetUser?.Name ?? "Unknown User",
+                    AttendanceStatus = dto.Status,
+                    Timestamp = DateTime.UtcNow,
+                    Source = "Manual Override"
+                };
+
+                await _mongoService.AuditLogs.InsertOneAsync(auditLog);
+
+                return Ok(new { success = true, message = "Attendance marked successfully." });
             }
             catch (Exception ex)
             {
