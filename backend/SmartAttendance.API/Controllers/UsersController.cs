@@ -14,11 +14,13 @@ namespace SmartAttendance.API.Controllers
     {
         private readonly MongoDbService _mongoService;
         private readonly PrismaDbContext _db;
+        private readonly IEmailService _emailService;
 
-        public UsersController(MongoDbService mongoService, PrismaDbContext db)
+        public UsersController(MongoDbService mongoService, PrismaDbContext db, IEmailService emailService)
         {
             _mongoService = mongoService;
             _db = db;
+            _emailService = emailService;
         }
 
         [HttpGet]
@@ -33,7 +35,14 @@ namespace SmartAttendance.API.Controllers
                 role = u.Role,
                 department = u.Department,
                 profileImage = u.ProfileImage,
-                hasFaceData = u.FaceData != null && u.FaceData.Any()
+                hasFaceData = u.FaceData != null && u.FaceData.Any(),
+                emailDeliveryStatus = u.EmailDeliveryStatus,
+                lastEmailAttempt = u.LastEmailAttempt,
+                createdAt = u.CreatedAt,
+                isDisabled = u.IsDisabled,
+                temporaryPassword = u.TemporaryPassword,
+                temporaryPasswordCreatedAt = u.TemporaryPasswordCreatedAt,
+                isPasswordChanged = u.IsPasswordChanged
             });
             return Ok(result);
         }
@@ -128,9 +137,66 @@ namespace SmartAttendance.API.Controllers
             }
             catch (Exception ex)
             {
-                Console.WriteLine($"[CLEANUP ERROR] Failed to clean up user data: {ex.Message}");
                 return StatusCode(500, new { message = "Failed to clean up user data completely." });
             }
+        }
+
+        [HttpPost("{id}/resend-credentials")]
+        public async Task<IActionResult> ResendCredentials(string id)
+        {
+            var user = await _mongoService.Users.Find(u => u.Id == id).FirstOrDefaultAsync();
+            if (user == null) return NotFound(new { message = "User not found" });
+
+            // Generate random password
+            var randomDigits = new Random().Next(1000, 9999);
+            var password = $"User@{randomDigits}";
+
+            user.Password = BCrypt.Net.BCrypt.HashPassword(password);
+            user.TemporaryPassword = password;
+            user.TemporaryPasswordCreatedAt = DateTime.UtcNow;
+            user.IsPasswordChanged = false;
+            user.EmailDeliveryStatus = "Pending";
+
+            await _mongoService.Users.ReplaceOneAsync(u => u.Id == id, user);
+
+            _ = Task.Run(async () =>
+            {
+                await _emailService.SendWelcomeEmailAsync(user, password);
+            });
+
+            return Ok(new { message = "Credentials generated and email sending started.", password = password });
+        }
+
+        [HttpPost("{id}/generate-credentials")]
+        public async Task<IActionResult> GenerateCredentials(string id)
+        {
+            var user = await _mongoService.Users.Find(u => u.Id == id).FirstOrDefaultAsync();
+            if (user == null) return NotFound(new { message = "User not found" });
+
+            // Generate random password
+            var randomDigits = new Random().Next(1000, 9999);
+            var password = $"User@{randomDigits}";
+
+            user.Password = BCrypt.Net.BCrypt.HashPassword(password);
+            user.TemporaryPassword = password;
+            user.TemporaryPasswordCreatedAt = DateTime.UtcNow;
+            user.IsPasswordChanged = false;
+
+            await _mongoService.Users.ReplaceOneAsync(u => u.Id == id, user);
+
+            return Ok(new { message = "New temporary credentials generated successfully.", password = password });
+        }
+
+        [HttpPut("{id}/toggle-status")]
+        public async Task<IActionResult> ToggleStatus(string id)
+        {
+            var user = await _mongoService.Users.Find(u => u.Id == id).FirstOrDefaultAsync();
+            if (user == null) return NotFound(new { message = "User not found" });
+
+            user.IsDisabled = !user.IsDisabled;
+            await _mongoService.Users.ReplaceOneAsync(u => u.Id == id, user);
+
+            return Ok(new { message = $"User {(user.IsDisabled ? "disabled" : "enabled")} successfully." });
         }
     }
 }

@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import api from '../utils/api';
-import { Pencil, Trash2, UserPlus, Search, Camera, Check, X } from 'lucide-react';
+import { Pencil, Trash2, UserPlus, Search, Camera, Check, X, Mail, Key, Power, ShieldAlert, CheckCircle, XCircle } from 'lucide-react';
 import FaceRegistrationModal from '../components/FaceRegistrationModal';
 
 const ManageUsers = () => {
@@ -8,9 +8,15 @@ const ManageUsers = () => {
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState('');
   
+  const [statusMsg, setStatusMsg] = useState({ message: '', type: '' });
+
   // User Form Modal State
   const [showModal, setShowModal] = useState(false);
   const [currentUser, setCurrentUser] = useState(null);
+
+  // Credentials Modal State
+  const [showCredsModal, setShowCredsModal] = useState(false);
+  const [selectedCreds, setSelectedCreds] = useState(null);
   
   // Face Registration Modal State
   const [showFaceModal, setShowFaceModal] = useState(false);
@@ -78,10 +84,62 @@ const ManageUsers = () => {
       try {
         await api.delete(`/users/${id}`);
         fetchUsers();
+        setStatusMsg({ message: 'User deleted successfully', type: 'success' });
       } catch {
-        alert('Failed to delete user');
+        setStatusMsg({ message: 'Failed to delete user', type: 'error' });
       }
     }
+  };
+
+  const handleResendCredentials = async (id) => {
+    if (window.confirm('Generate new password and resend credentials?')) {
+      try {
+        setStatusMsg({ message: 'Sending credentials...', type: 'info' });
+        await api.post(`/users/${id}/resend-credentials`);
+        fetchUsers();
+        setStatusMsg({ message: 'Credentials generated and email sending started', type: 'success' });
+        // Close modal if open
+        if (showCredsModal && selectedCreds?.id === id) setShowCredsModal(false);
+      } catch {
+        setStatusMsg({ message: 'Failed to resend credentials', type: 'error' });
+      }
+    }
+  };
+
+  const handleGenerateCredentials = async (id) => {
+    if (window.confirm('Generate new temporary password (without sending email)?')) {
+      try {
+        setStatusMsg({ message: 'Generating new credentials...', type: 'info' });
+        const res = await api.post(`/users/${id}/generate-credentials`);
+        fetchUsers();
+        setStatusMsg({ message: 'New temporary credentials generated successfully', type: 'success' });
+        if (showCredsModal && selectedCreds?.id === id) {
+          setSelectedCreds({
+            ...selectedCreds,
+            temporaryPassword: res.data.password,
+            temporaryPasswordCreatedAt: new Date().toISOString(),
+            isPasswordChanged: false
+          });
+        }
+      } catch {
+        setStatusMsg({ message: 'Failed to generate new credentials', type: 'error' });
+      }
+    }
+  };
+
+  const handleToggleStatus = async (id) => {
+    try {
+      await api.put(`/users/${id}/toggle-status`);
+      fetchUsers();
+      setStatusMsg({ message: 'User status updated', type: 'success' });
+    } catch {
+      setStatusMsg({ message: 'Failed to update user status', type: 'error' });
+    }
+  };
+
+  const handleViewCreds = (user) => {
+    setSelectedCreds(user);
+    setShowCredsModal(true);
   };
 
   const handleSubmit = async (e) => {
@@ -122,6 +180,24 @@ const ManageUsers = () => {
         </button>
       </div>
 
+      {statusMsg.message && (
+        <div className="animate-fade-in" style={{
+          backgroundColor: statusMsg.type === 'error' ? 'rgba(239, 68, 68, 0.1)' : statusMsg.type === 'info' ? 'rgba(59, 130, 246, 0.1)' : 'rgba(16, 185, 129, 0.1)',
+          color: statusMsg.type === 'error' ? 'var(--danger)' : statusMsg.type === 'info' ? '#3b82f6' : 'var(--success)',
+          border: `1px solid ${statusMsg.type === 'error' ? 'rgba(239, 68, 68, 0.2)' : statusMsg.type === 'info' ? 'rgba(59, 130, 246, 0.2)' : 'rgba(16, 185, 129, 0.2)'}`,
+          padding: '0.75rem',
+          borderRadius: '0.5rem',
+          marginBottom: '1.5rem',
+          fontSize: '0.875rem',
+          display: 'flex',
+          alignItems: 'center',
+          gap: '0.5rem'
+        }}>
+          {statusMsg.type === 'error' ? <XCircle size={18} /> : <CheckCircle size={18} />}
+          {statusMsg.message}
+        </div>
+      )}
+
       <div className="card glass animate-fade-in" style={{ padding: '0', overflow: 'hidden' }}>
         <div style={{ padding: '1.5rem', borderBottom: '1px solid var(--border)' }}>
           <div className="input-group" style={{ marginBottom: 0 }}>
@@ -146,7 +222,7 @@ const ManageUsers = () => {
             <thead style={{ backgroundColor: '#f8fafc' }}>
               <tr>
                 <th>Name</th>
-                <th>Email</th>
+                <th>Email / Status</th>
                 <th>Role</th>
                 <th>Department</th>
                 <th>Face Status</th>
@@ -173,7 +249,21 @@ const ManageUsers = () => {
                         <span style={{ fontWeight: 500 }}>{user.name}</span>
                       </div>
                     </td>
-                    <td style={{ color: 'var(--text-muted)' }}>{user.email}</td>
+                    <td>
+                      <div style={{ display: 'flex', flexDirection: 'column', gap: '0.25rem' }}>
+                        <span style={{ color: 'var(--text-muted)' }}>{user.email}</span>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                          <span className={`badge ${user.emailDeliveryStatus === 'Sent' ? 'badge-success' : user.emailDeliveryStatus === 'Failed' ? 'badge-danger' : 'badge-warning'}`} style={{ fontSize: '0.7rem', padding: '0.1rem 0.4rem' }}>
+                            {user.emailDeliveryStatus || 'Unknown'}
+                          </span>
+                          {user.lastEmailAttempt && (
+                            <span style={{ fontSize: '0.7rem', color: 'var(--text-muted)' }}>
+                              {new Date(user.lastEmailAttempt).toLocaleDateString()}
+                            </span>
+                          )}
+                        </div>
+                      </div>
+                    </td>
                     <td>
                       <span className={`badge ${user.role === 'Admin' ? 'badge-danger' : user.role === 'Employee' ? 'badge-primary' : 'badge-success'}`}>
                         {user.role}
@@ -183,28 +273,33 @@ const ManageUsers = () => {
                     <td>
                       {user.hasFaceData ? (
                         <span style={{ display: 'flex', alignItems: 'center', gap: '0.25rem', color: 'var(--success)', fontSize: '0.875rem', fontWeight: 500 }}>
-                          <Check size={16} /> Registered
+                          <Check size={16} /> Reg
                         </span>
                       ) : (
                         <span style={{ display: 'flex', alignItems: 'center', gap: '0.25rem', color: 'var(--text-muted)', fontSize: '0.875rem', fontWeight: 500 }}>
-                          <X size={16} /> Not Registered
+                          <X size={16} /> Unreg
                         </span>
                       )}
                     </td>
                     <td style={{ textAlign: 'right' }}>
-                      <div style={{ display: 'flex', gap: '0.5rem', justifyContent: 'flex-end' }}>
-                        <button 
-                          style={{ color: user.hasFaceData ? 'var(--success)' : 'var(--text-muted)', padding: '0.5rem', border: '1px solid var(--border)', borderRadius: '4px', backgroundColor: 'transparent', cursor: 'pointer' }} 
-                          onClick={() => openFaceModal(user)} 
-                          title="Register Face"
-                        >
-                          <Camera size={16} style={{ display: 'block' }} />
+                      <div style={{ display: 'flex', gap: '0.25rem', justifyContent: 'flex-end', flexWrap: 'wrap', maxWidth: '180px', marginLeft: 'auto' }}>
+                        <button style={{ color: user.hasFaceData ? 'var(--success)' : 'var(--text-muted)', padding: '0.4rem', border: '1px solid var(--border)', borderRadius: '4px', backgroundColor: 'transparent', cursor: 'pointer' }} onClick={() => openFaceModal(user)} title="Register Face">
+                          <Camera size={14} />
                         </button>
-                        <button style={{ color: 'var(--primary)', padding: '0.5rem', border: 'none', background: 'none', cursor: 'pointer' }} onClick={() => openEditModal(user)} aria-label="Edit user">
-                          <Pencil size={18} />
+                        <button style={{ color: '#3b82f6', padding: '0.4rem', border: '1px solid var(--border)', borderRadius: '4px', backgroundColor: 'transparent', cursor: 'pointer' }} onClick={() => handleResendCredentials(user.id)} title="Resend Credentials">
+                          <Mail size={14} />
                         </button>
-                        <button style={{ color: 'var(--danger)', padding: '0.5rem', border: 'none', background: 'none', cursor: 'pointer' }} onClick={() => handleDelete(user.id)} aria-label="Delete user">
-                          <Trash2 size={18} />
+                        <button style={{ color: user.temporaryPassword ? '#eab308' : 'var(--text-muted)', padding: '0.4rem', border: '1px solid var(--border)', borderRadius: '4px', backgroundColor: 'transparent', cursor: 'pointer' }} onClick={() => handleViewCreds(user)} title="View Temp Password">
+                          <Key size={14} />
+                        </button>
+                        <button style={{ color: user.isDisabled ? 'var(--warning)' : 'var(--success)', padding: '0.4rem', border: '1px solid var(--border)', borderRadius: '4px', backgroundColor: 'transparent', cursor: 'pointer' }} onClick={() => handleToggleStatus(user.id)} title={user.isDisabled ? "Enable User" : "Disable User"}>
+                          {user.isDisabled ? <ShieldAlert size={14} /> : <Power size={14} />}
+                        </button>
+                        <button style={{ color: 'var(--primary)', padding: '0.4rem', border: '1px solid var(--border)', borderRadius: '4px', backgroundColor: 'transparent', cursor: 'pointer' }} onClick={() => openEditModal(user)} title="Edit user">
+                          <Pencil size={14} />
+                        </button>
+                        <button style={{ color: 'var(--danger)', padding: '0.4rem', border: '1px solid var(--border)', borderRadius: '4px', backgroundColor: 'transparent', cursor: 'pointer' }} onClick={() => handleDelete(user.id)} title="Delete user">
+                          <Trash2 size={14} />
                         </button>
                       </div>
                     </td>
@@ -324,6 +419,114 @@ const ManageUsers = () => {
             fetchUsers();
           }}
         />
+      )}
+
+      {/* Credentials Modal */}
+      {showCredsModal && selectedCreds && (
+        <div style={{
+          position: 'fixed',
+          top: 0, left: 0, right: 0, bottom: 0,
+          backgroundColor: 'rgba(0,0,0,0.5)',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          zIndex: 40,
+          backdropFilter: 'blur(4px)'
+        }}>
+          <div className="card animate-fade-in" style={{ width: '100%', maxWidth: '400px', backgroundColor: 'var(--surface)' }}>
+            <h2 style={{ marginBottom: '1.5rem', fontSize: '1.25rem', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+              <Key size={20} style={{ color: '#eab308' }} />
+              Generated Credentials
+            </h2>
+            
+            <p style={{ color: 'var(--text-muted)', fontSize: '0.9rem', marginBottom: '1.5rem' }}>
+              Temporary credentials for <strong>{selectedCreds.name}</strong>. These will be cleared once the user changes their password.
+            </p>
+
+            <div style={{ backgroundColor: 'var(--background)', padding: '1rem', borderRadius: '0.5rem', border: '1px solid var(--border)', marginBottom: '1.5rem' }}>
+              <div style={{ marginBottom: '1rem' }}>
+                <span style={{ fontSize: '0.8rem', color: 'var(--text-muted)', display: 'block', marginBottom: '0.25rem' }}>Email / Username</span>
+                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', backgroundColor: 'var(--surface)', padding: '0.5rem 0.75rem', borderRadius: '0.25rem', border: '1px solid var(--border)' }}>
+                  <span style={{ fontWeight: 500, userSelect: 'all' }}>{selectedCreds.email}</span>
+                  <button 
+                    className="btn" 
+                    style={{ padding: '0.25rem 0.5rem', fontSize: '0.8rem' }}
+                    onClick={() => {
+                      navigator.clipboard.writeText(selectedCreds.email);
+                      alert('Username copied to clipboard!');
+                    }}
+                  >
+                    Copy
+                  </button>
+                </div>
+              </div>
+              
+              <div style={{ marginBottom: '1rem' }}>
+                <span style={{ fontSize: '0.8rem', color: 'var(--text-muted)', display: 'block', marginBottom: '0.25rem' }}>Temporary Password</span>
+                {!selectedCreds.isPasswordChanged && selectedCreds.temporaryPassword ? (
+                  <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', backgroundColor: 'var(--surface)', padding: '0.5rem 0.75rem', borderRadius: '0.25rem', border: '1px solid var(--border)' }}>
+                    <span style={{ fontWeight: 600, letterSpacing: '1px', userSelect: 'all' }}>{selectedCreds.temporaryPassword}</span>
+                    <button 
+                      className="btn btn-primary" 
+                      style={{ padding: '0.25rem 0.5rem', fontSize: '0.8rem' }}
+                      onClick={() => {
+                        navigator.clipboard.writeText(selectedCreds.temporaryPassword);
+                        alert('Password copied to clipboard!');
+                      }}
+                    >
+                      Copy
+                    </button>
+                  </div>
+                ) : (
+                  <div style={{ backgroundColor: 'rgba(234, 179, 8, 0.1)', border: '1px solid rgba(234, 179, 8, 0.2)', padding: '0.75rem', borderRadius: '0.25rem' }}>
+                    <span style={{ color: 'var(--warning)', fontSize: '0.9rem', display: 'flex', alignItems: 'flex-start', gap: '0.5rem' }}>
+                      <ShieldAlert size={16} style={{ flexShrink: 0, marginTop: '0.1rem' }} />
+                      User has changed password. Temporary password is no longer available.
+                    </span>
+                  </div>
+                )}
+              </div>
+
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', fontSize: '0.8rem' }}>
+                <div>
+                  <span style={{ color: 'var(--text-muted)' }}>Status: </span>
+                  <span style={{ fontWeight: 500, color: selectedCreds.isPasswordChanged ? 'var(--success)' : 'var(--warning)' }}>
+                    {selectedCreds.isPasswordChanged ? 'Changed by user' : 'Pending user login'}
+                  </span>
+                </div>
+                {selectedCreds.temporaryPasswordCreatedAt && (
+                  <div>
+                    <span style={{ color: 'var(--text-muted)' }}>Generated: </span>
+                    <span style={{ fontWeight: 500 }}>{new Date(selectedCreds.temporaryPasswordCreatedAt).toLocaleDateString()}</span>
+                  </div>
+                )}
+              </div>
+            </div>
+
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem', marginBottom: '1.5rem' }}>
+              <button 
+                type="button" 
+                className="btn btn-primary" 
+                style={{ width: '100%', justifyContent: 'center' }}
+                onClick={() => handleResendCredentials(selectedCreds.id)}
+              >
+                <Mail size={16} /> Resend Credentials Email
+              </button>
+              <button 
+                type="button" 
+                className="btn" 
+                style={{ width: '100%', justifyContent: 'center', border: '1px solid var(--border)' }}
+                onClick={() => handleGenerateCredentials(selectedCreds.id)}
+              >
+                <Key size={16} /> Generate New Temporary Password
+              </button>
+            </div>
+
+            <div style={{ display: 'flex', justifyContent: 'flex-end', paddingTop: '1rem', borderTop: '1px solid var(--border)' }}>
+              <button type="button" className="btn btn-secondary" onClick={() => setShowCredsModal(false)}>Close</button>
+            </div>
+          </div>
+        </div>
       )}
     </div>
   );

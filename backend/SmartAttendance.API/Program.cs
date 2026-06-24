@@ -32,6 +32,9 @@ builder.Services.AddSingleton<PrismaDbContext>(sp =>
     return new PrismaDbContext(mongoClient, "SmartAttendance");
 });
 
+// Register Email Service
+builder.Services.AddSingleton<IEmailService, EmailService>();
+
 // Register Scheduled Background Threads
 builder.Services.AddHostedService<SmartAttendance.API.BackgroundJobs.AutoAbsentService>();
 

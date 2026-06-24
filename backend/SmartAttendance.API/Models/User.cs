@@ -36,5 +36,38 @@ namespace SmartAttendance.API.Models
 
         [BsonElement("faceData")]
         public List<double[]> FaceData { get; set; } = new List<double[]>();
+
+        [BsonElement("emailDeliveryStatus")]
+        public string EmailDeliveryStatus { get; set; } = "Pending"; // Pending, Sent, Failed
+
+        [BsonElement("emailSent")]
+        public bool EmailSent { get; set; } = false;
+
+        [BsonElement("emailSentAt")]
+        public DateTime? EmailSentAt { get; set; }
+
+        [BsonElement("lastEmailAttempt")]
+        public DateTime? LastEmailAttempt { get; set; }
+
+        [BsonElement("temporaryPassword")]
+        public string? TemporaryPassword { get; set; }
+
+        [BsonElement("temporaryPasswordCreatedAt")]
+        public DateTime? TemporaryPasswordCreatedAt { get; set; }
+
+        [BsonElement("isPasswordChanged")]
+        public bool IsPasswordChanged { get; set; } = false;
+
+        [BsonElement("isDisabled")]
+        public bool IsDisabled { get; set; } = false;
+
+        [BsonElement("failedOtpAttempts")]
+        public int FailedOtpAttempts { get; set; } = 0;
+
+        [BsonElement("otpLastRequestedAt")]
+        public DateTime? OtpLastRequestedAt { get; set; }
+
+        [BsonElement("createdAt")]
+        public DateTime CreatedAt { get; set; } = DateTime.UtcNow;
     }
 }
