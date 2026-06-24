@@ -1,4 +1,4 @@
-import React, { useState, useContext } from 'react';
+import React, { useState, useContext, useEffect } from 'react';
 import { AuthContext } from '../context/AuthContext';
 import api from '../utils/api';
 import { useNavigate, Link } from 'react-router-dom';
@@ -14,9 +14,25 @@ const Login = () => {
   const [error, setError] = useState('');
   const [success, setSuccess] = useState('');
   const [loading, setLoading] = useState(false);
+  const [loadingText, setLoadingText] = useState('');
 
   const { login } = useContext(AuthContext);
   const navigate = useNavigate();
+
+  // Warm-up check
+  useEffect(() => {
+    const warmUp = async () => {
+      const start = Date.now();
+      try {
+        console.log('[WARM-UP] Pinging /api/health to wake server...');
+        await api.get('/api/health', { timeout: 30000 });
+        console.log(`[WARM-UP SUCCESS] Time: ${Date.now() - start}ms`);
+      } catch (err) {
+        console.log(`[WARM-UP FAILED/TIMEOUT] Time: ${Date.now() - start}ms. Error:`, err.message);
+      }
+    };
+    warmUp();
+  }, []);
 
   const handleRoleChange = (selectedRole) => {
     setRole(selectedRole);
@@ -34,17 +50,25 @@ const Login = () => {
       return;
     }
 
-    console.log('[LOGIN START]');
+    const startTime = Date.now();
+    setLoadingText('Connecting to server... Please wait.');
+
+    const timer1 = setTimeout(() => {
+      setLoadingText('Connecting to server... Please wait.');
+    }, 1000);
+
+    const timer2 = setTimeout(() => {
+      setLoadingText('Server is waking up. This may take 20-30 seconds.');
+    }, 5000);
 
     const executeLogin = async (retryCount = 0) => {
       try {
-        console.log('[REQUEST SENT]');
-        return await api.post('/auth/login', { email, password, role }, { timeout: 5000 });
+        console.log(`[REQUEST SENT] Attempt ${retryCount + 1}`);
+        return await api.post('/auth/login', { email, password, role }, { timeout: 60000 });
       } catch (error) {
-        if (error.code === 'ECONNABORTED' && retryCount < 1) {
-          console.log('[REQUEST TIMEOUT] Retrying authentication...');
-          console.log('[REQUEST SENT]');
-          return await api.post('/auth/login', { email, password, role }, { timeout: 5000 });
+        if ((error.code === 'ECONNABORTED' || error.message === 'Network Error') && retryCount < 2) {
+          console.log(`[REQUEST FAILED] Retrying authentication (${retryCount + 1}/2)...`);
+          return await executeLogin(retryCount + 1);
         }
         throw error;
       }
@@ -52,8 +76,12 @@ const Login = () => {
 
     try {
       const response = await executeLogin();
-      console.log('[RESPONSE RECEIVED]');
+      const duration = Date.now() - startTime;
+      console.log(`[RESPONSE RECEIVED] Time: ${duration}ms`);
       
+      clearTimeout(timer1);
+      clearTimeout(timer2);
+
       login(response.data.user, response.data.token);
       console.log('[JWT RECEIVED]');
       
@@ -72,16 +100,31 @@ const Login = () => {
         navigate('/'); // Fallback
       }
     } catch (err) {
+      clearTimeout(timer1);
+      clearTimeout(timer2);
       console.log('[LOGIN FAILED]');
       console.error('Detailed Error:', err);
-      setError(
-        err.response?.data?.message ||
-        err.response?.data?.title ||
-        err.message ||
-        'Failed to sign in securely. Please check your network connection.'
-      );
+      
+      let errorMessage = 'Failed to sign in securely. Please check your network connection.';
+      
+      if (err.code === 'ECONNABORTED') {
+        errorMessage = 'Server is taking longer than expected to respond.';
+      } else if (err.message === 'Network Error') {
+        errorMessage = 'Unable to reach server. Please check your connection.';
+      } else if (err.response) {
+        if (err.response.status === 401) {
+          errorMessage = 'Invalid email or password.';
+        } else if (err.response.status === 500) {
+          errorMessage = 'Server error occurred. Please try again.';
+        } else {
+          errorMessage = err.response.data?.message || err.response.data?.title || errorMessage;
+        }
+      }
+      
+      setError(errorMessage);
     } finally {
       setLoading(false);
+      setLoadingText('');
     }
   };
 
@@ -261,7 +304,7 @@ const Login = () => {
             style={{ width: '100%', padding: '0.875rem', fontSize: '1rem', marginTop: '1rem' }}
             disabled={loading}
           >
-            {loading ? 'Authenticating...' : 'Sign In To Proceed'}
+            {loading ? loadingText : 'Sign In To Proceed'}
           </button>
         </form>
 
