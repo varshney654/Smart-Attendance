@@ -23,19 +23,51 @@ namespace SmartAttendance.API.Services
 
         private async Task ExecuteWithRetryAsync(string email, string subject, string body, User userToUpdate)
         {
+            Console.WriteLine("[ENTERED EMAIL SERVICE] ExecuteWithRetryAsync started.");
             int maxRetries = 3;
             int[] delaySeconds = { 2, 5, 10 };
             
             var smtpEmail = Environment.GetEnvironmentVariable("SMTP_EMAIL") ?? "smartattendance88@gmail.com";
-            var smtpPassword = Environment.GetEnvironmentVariable("SMTP_APP_PASSWORD") ?? "bmvi jgsv njlj udmb";
+            var smtpPassword = Environment.GetEnvironmentVariable("SMTP_PASSWORD") 
+                               ?? Environment.GetEnvironmentVariable("SMTP_APP_PASSWORD") 
+                               ?? "bmvi jgsv njlj udmb";
+            var smtpHost = Environment.GetEnvironmentVariable("SMTP_HOST") ?? "smtp.gmail.com";
+            var smtpPortStr = Environment.GetEnvironmentVariable("SMTP_PORT") ?? "587";
+
+            // Validate configuration
+            if (string.IsNullOrWhiteSpace(smtpHost))
+            {
+                Console.WriteLine("[SMTP ERROR] Configuration Invalid: SMTP_HOST is empty.");
+                await UpdateUserEmailStatusAsync(userToUpdate.Id, "Failed");
+                return;
+            }
+            if (!int.TryParse(smtpPortStr, out int smtpPort))
+            {
+                Console.WriteLine($"[SMTP ERROR] Configuration Invalid: SMTP_PORT '{smtpPortStr}' is not a valid integer.");
+                await UpdateUserEmailStatusAsync(userToUpdate.Id, "Failed");
+                return;
+            }
+            if (string.IsNullOrWhiteSpace(smtpEmail))
+            {
+                Console.WriteLine("[SMTP ERROR] Configuration Invalid: SMTP_EMAIL is empty.");
+                await UpdateUserEmailStatusAsync(userToUpdate.Id, "Failed");
+                return;
+            }
+            if (string.IsNullOrWhiteSpace(smtpPassword))
+            {
+                Console.WriteLine("[SMTP ERROR] Configuration Invalid: SMTP_PASSWORD is empty.");
+                await UpdateUserEmailStatusAsync(userToUpdate.Id, "Failed");
+                return;
+            }
 
             for (int attempt = 1; attempt <= maxRetries; attempt++)
             {
                 try
                 {
                     Console.WriteLine($"[SMTP ATTEMPT {attempt}] Sending to {email}...");
+                    Console.WriteLine("[SMTP CONNECT] Attempting connection...");
                     
-                    using var smtpClient = new SmtpClient("smtp.gmail.com", 587)
+                    using var smtpClient = new SmtpClient(smtpHost, smtpPort)
                     {
                         EnableSsl = true,
                         UseDefaultCredentials = false,
@@ -62,16 +94,60 @@ namespace SmartAttendance.API.Services
                 }
                 catch (Exception ex)
                 {
-                    Console.WriteLine($"[SMTP FAILURE] Attempt {attempt} failed for {email}");
-                    Console.WriteLine($"User: {email}");
-                    Console.WriteLine($"Time: {DateTime.UtcNow}");
-                    Console.WriteLine($"Error: {ex.Message}");
-                    Console.WriteLine($"Stack Trace: {ex.StackTrace}");
+                    Console.WriteLine("[SMTP FAILED] An exception occurred during SendMailAsync.");
+                    string maskedEmail = smtpEmail;
+                    if (!string.IsNullOrEmpty(smtpEmail) && smtpEmail.Contains("@"))
+                    {
+                        var parts = smtpEmail.Split('@');
+                        maskedEmail = new string('*', Math.Max(1, parts[0].Length)) + "@" + parts[1];
+                    }
                     
+                    Console.WriteLine("SMTP ERROR");
+                    Console.WriteLine($"Host: {smtpHost}");
+                    Console.WriteLine($"Port: {smtpPort}");
+                    Console.WriteLine($"SSL: true");
+                    Console.WriteLine($"Email: {maskedEmail}");
+                    Console.WriteLine($"Attempt: {attempt}");
+                    Console.WriteLine();
+                    Console.WriteLine("Exception:");
+                    Console.WriteLine(ex.ToString());
+                    Console.WriteLine();
+                    Console.WriteLine("Message:");
+                    Console.WriteLine(ex.Message);
+                    Console.WriteLine();
+                    Console.WriteLine("Inner Exception:");
+                    Console.WriteLine(ex.InnerException?.ToString() ?? "None");
+                    Console.WriteLine();
+                    
+                    if (ex is SmtpException smtpEx)
+                    {
+                        Console.WriteLine("SMTP StatusCode:");
+                        Console.WriteLine(smtpEx.StatusCode.ToString());
+                        Console.WriteLine();
+                    }
+                    
+                    Console.WriteLine("Stack Trace:");
+                    Console.WriteLine(ex.StackTrace);
+                    
+                    // Check if it's a non-transient error (like authentication)
+                    bool isAuthError = false;
+                    string exStr = ex.ToString().ToLower();
+                    if (exStr.Contains("authentication") || exStr.Contains("credentials") || exStr.Contains("535") || exStr.Contains("530"))
+                    {
+                        isAuthError = true;
+                    }
+                    
+                    if (isAuthError)
+                    {
+                        Console.WriteLine($"[SMTP ABORTED] Authentication failed. Aborting retries.");
+                        await UpdateUserEmailStatusAsync(userToUpdate.Id, "Failed");
+                        return;
+                    }
+
                     if (attempt < maxRetries)
                     {
                         int delay = delaySeconds[attempt - 1];
-                        Console.WriteLine($"[RETRYING IN {delay}s]");
+                        Console.WriteLine($"[RETRYING IN {delay}s] Transient failure detected.");
                         await Task.Delay(delay * 1000);
                     }
                     else

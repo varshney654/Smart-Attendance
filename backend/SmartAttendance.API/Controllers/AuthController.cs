@@ -187,7 +187,8 @@ namespace SmartAttendance.API.Controllers
         [HttpPost("/api/request-access")]
         public async Task<IActionResult> RequestAccess([FromBody] RequestAccessDto request)
         {
-            Console.WriteLine("[REQUEST RECEIVED]");
+            Console.WriteLine("[API HIT] /api/request-access");
+            Console.WriteLine("[VALIDATION PASSED]");
             try
             {
                 var existingUser = await _users.FindByEmailAsync(request.Email);
@@ -215,6 +216,7 @@ namespace SmartAttendance.API.Controllers
                 };
                 await _users.CreateAsync(user);
                 Console.WriteLine("[USER CREATED]");
+                Console.WriteLine("[DATABASE SAVE COMPLETE]");
 
                 // Create AccessRequest (Auto Approved)
                 var accessRequest = new AccessRequest
@@ -226,17 +228,18 @@ namespace SmartAttendance.API.Controllers
                 };
                 await _db.AccessRequests.CreateAsync(accessRequest);
 
-                // Run email in background to avoid blocking account creation
-                _ = Task.Run(async () =>
-                {
-                    await _emailService.SendWelcomeEmailAsync(user, password);
-                });
+                Console.WriteLine("[CALLING EMAIL SERVICE]");
+                
+                // Run email synchronously to avoid swallowing exceptions and verify logs
+                await _emailService.SendWelcomeEmailAsync(user, password);
 
+                Console.WriteLine("[API RESPONSE]");
                 return Ok(new { success = true, message = "Your account has been created successfully. Login credentials will be sent to your email shortly." });
             }
             catch (Exception ex)
             {
-                Console.WriteLine($"[ERROR] DB save failed: {ex.Message}");
+                Console.WriteLine($"[ERROR] Exception caught in RequestAccess: {ex.Message}");
+                Console.WriteLine(ex.ToString());
                 return StatusCode(500, new { success = false, message = "Failed to submit request." });
             }
         }

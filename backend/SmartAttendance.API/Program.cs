@@ -18,6 +18,14 @@ if (builder.Environment.IsDevelopment())
 // Fix TLS issue on Windows
 ServicePointManager.SecurityProtocol = SecurityProtocolType.Tls12 | SecurityProtocolType.Tls11 | SecurityProtocolType.Tls;
 
+// Verify SMTP Environment Variables
+Console.WriteLine("--- Checking SMTP Environment Variables ---");
+if (string.IsNullOrEmpty(Environment.GetEnvironmentVariable("SMTP_EMAIL"))) Console.WriteLine("WARNING: SMTP_EMAIL environment variable is missing.");
+if (string.IsNullOrEmpty(Environment.GetEnvironmentVariable("SMTP_PASSWORD")) && string.IsNullOrEmpty(Environment.GetEnvironmentVariable("SMTP_APP_PASSWORD"))) Console.WriteLine("WARNING: SMTP_PASSWORD environment variable is missing.");
+if (string.IsNullOrEmpty(Environment.GetEnvironmentVariable("SMTP_HOST"))) Console.WriteLine("WARNING: SMTP_HOST environment variable is missing. (Defaults to smtp.gmail.com)");
+if (string.IsNullOrEmpty(Environment.GetEnvironmentVariable("SMTP_PORT"))) Console.WriteLine("WARNING: SMTP_PORT environment variable is missing. (Defaults to 587)");
+Console.WriteLine("-------------------------------------------");
+
 // Add services to the container.
 builder.Services.Configure<DatabaseSettings>(
     builder.Configuration.GetSection("SmartAttendanceDatabase"));
