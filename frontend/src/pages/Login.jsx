@@ -19,16 +19,23 @@ const Login = () => {
   const { login } = useContext(AuthContext);
   const navigate = useNavigate();
 
-  // Warm-up check
+  // Warm-up check — wake up the server on Render free tier
   useEffect(() => {
     const warmUp = async () => {
       const start = Date.now();
       try {
-        console.log('[WARM-UP] Pinging /api/health to wake server...');
-        await api.get('/api/health', { timeout: 30000 });
+        console.log('[WARM-UP] Pinging /health to wake server...');
+        await api.get('/health', { timeout: 45000 });
         console.log(`[WARM-UP SUCCESS] Time: ${Date.now() - start}ms`);
       } catch (err) {
         console.log(`[WARM-UP FAILED/TIMEOUT] Time: ${Date.now() - start}ms. Error:`, err.message);
+        // Retry warm-up once in case of cold start
+        try {
+          await api.get('/health', { timeout: 30000 });
+          console.log(`[WARM-UP RETRY SUCCESS] Time: ${Date.now() - start}ms`);
+        } catch (retryErr) {
+          console.log(`[WARM-UP RETRY FAILED] Time: ${Date.now() - start}ms`);
+        }
       }
     };
     warmUp();
@@ -61,13 +68,21 @@ const Login = () => {
       setLoadingText('Server is waking up. This may take 20-30 seconds.');
     }, 5000);
 
+    const timer3 = setTimeout(() => {
+      setLoadingText('Almost there... Server is starting up.');
+    }, 15000);
+
+    const timer4 = setTimeout(() => {
+      setLoadingText('Still connecting... Please be patient.');
+    }, 30000);
+
     const executeLogin = async (retryCount = 0) => {
       try {
         console.log(`[REQUEST SENT] Attempt ${retryCount + 1}`);
         return await api.post('/auth/login', { email, password, role }, { timeout: 60000 });
       } catch (error) {
-        if ((error.code === 'ECONNABORTED' || error.message === 'Network Error') && retryCount < 2) {
-          console.log(`[REQUEST FAILED] Retrying authentication (${retryCount + 1}/2)...`);
+        if ((error.code === 'ECONNABORTED' || error.message === 'Network Error') && retryCount < 3) {
+          console.log(`[REQUEST FAILED] Retrying authentication (${retryCount + 1}/3)...`);
           return await executeLogin(retryCount + 1);
         }
         throw error;
@@ -81,6 +96,8 @@ const Login = () => {
       
       clearTimeout(timer1);
       clearTimeout(timer2);
+      clearTimeout(timer3);
+      clearTimeout(timer4);
 
       login(response.data.user, response.data.token);
       console.log('[JWT RECEIVED]');
@@ -102,6 +119,8 @@ const Login = () => {
     } catch (err) {
       clearTimeout(timer1);
       clearTimeout(timer2);
+      clearTimeout(timer3);
+      clearTimeout(timer4);
       console.log('[LOGIN FAILED]');
       console.error('Detailed Error:', err);
       

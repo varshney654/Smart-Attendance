@@ -11,12 +11,8 @@ namespace SmartAttendance.API.Services
         public readonly IMongoCollection<Alert> Alerts;
         public readonly IMongoCollection<AuditLog> AuditLogs;
 
-        public MongoDbService(IOptions<DatabaseSettings> databaseSettings, IConfiguration configuration)
+        public MongoDbService(IOptions<DatabaseSettings> databaseSettings, IMongoClient mongoClient)
         {
-            // Load MONGO_URI from env if exists, else fallback to appsettings
-            var mongoUri = Environment.GetEnvironmentVariable("MONGO_URI") ?? databaseSettings.Value.ConnectionString;
-
-            var mongoClient = new MongoClient(mongoUri);
             var mongoDatabase = mongoClient.GetDatabase(databaseSettings.Value.DatabaseName);
 
             Users = mongoDatabase.GetCollection<User>(databaseSettings.Value.UsersCollectionName);

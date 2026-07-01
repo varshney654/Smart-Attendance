@@ -218,6 +218,10 @@ namespace SmartAttendance.API.Controllers
                 Console.WriteLine("[USER CREATED]");
                 Console.WriteLine("[DATABASE SAVE COMPLETE]");
 
+                // Re-read user from DB to get the MongoDB-assigned Id
+                var savedUser = await _users.FindByEmailAsync(user.Email);
+                if (savedUser != null) user = savedUser;
+
                 // Create AccessRequest (Auto Approved)
                 var accessRequest = new AccessRequest
                 {
@@ -230,8 +234,21 @@ namespace SmartAttendance.API.Controllers
 
                 Console.WriteLine("[CALLING EMAIL SERVICE]");
                 
-                // Run email synchronously to avoid swallowing exceptions and verify logs
-                await _emailService.SendWelcomeEmailAsync(user, password);
+                // Fire-and-forget email — don't block the API response
+                var emailUser = user;
+                var emailPassword = password;
+                _ = Task.Run(async () =>
+                {
+                    try
+                    {
+                        await _emailService.SendWelcomeEmailAsync(emailUser, emailPassword);
+                        Console.WriteLine("[EMAIL] Welcome email task completed.");
+                    }
+                    catch (Exception emailEx)
+                    {
+                        Console.WriteLine($"[EMAIL ERROR] Failed to send welcome email to {emailUser.Email}: {emailEx.Message}");
+                    }
+                });
 
                 Console.WriteLine("[API RESPONSE]");
                 return Ok(new { success = true, message = "Your account has been created successfully. Login credentials will be sent to your email shortly." });
@@ -275,13 +292,27 @@ namespace SmartAttendance.API.Controllers
             };
             await _users.CreateAsync(user);
 
+            // Re-read user from DB to get the MongoDB-assigned Id
+            var savedUser = await _users.FindByEmailAsync(user.Email);
+            if (savedUser != null) user = savedUser;
+
             request.Status = "Approved";
             await _db.AccessRequests.UpdateAsync(id, request);
 
             // Run email in background to avoid blocking the API response
+            var emailUser = user;
+            var emailPassword = password;
             _ = Task.Run(async () =>
             {
-                await _emailService.SendAccessApprovedEmailAsync(user, password);
+                try
+                {
+                    await _emailService.SendAccessApprovedEmailAsync(emailUser, emailPassword);
+                    Console.WriteLine("[EMAIL] Access approved email task completed.");
+                }
+                catch (Exception emailEx)
+                {
+                    Console.WriteLine($"[EMAIL ERROR] Failed to send approval email to {emailUser.Email}: {emailEx.Message}");
+                }
             });
 
             return Ok(new { success = true, message = "Request approved and user created." });

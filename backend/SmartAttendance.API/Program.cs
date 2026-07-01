@@ -12,7 +12,31 @@ var builder = WebApplication.CreateBuilder(args);
 // Only load .env file in development (not in Docker/Render)
 if (builder.Environment.IsDevelopment())
 {
-    DotNetEnv.Env.Load("../../.env");
+    // Try multiple paths to find .env (handles dotnet run vs bin/Debug paths)
+    var possibleEnvPaths = new[]
+    {
+        Path.Combine(Directory.GetCurrentDirectory(), "..", "..", ".env"),
+        Path.Combine(AppContext.BaseDirectory, "..", "..", "..", "..", "..", ".env"),
+        Path.Combine(Directory.GetCurrentDirectory(), ".env")
+    };
+
+    var envLoaded = false;
+    foreach (var envPath in possibleEnvPaths)
+    {
+        var fullPath = Path.GetFullPath(envPath);
+        if (File.Exists(fullPath))
+        {
+            DotNetEnv.Env.Load(fullPath);
+            Console.WriteLine($"[ENV] Loaded .env from: {fullPath}");
+            envLoaded = true;
+            break;
+        }
+    }
+    if (!envLoaded)
+    {
+        Console.WriteLine("[ENV WARNING] .env file not found! SMTP and other credentials may not be available.");
+        Console.WriteLine($"[ENV WARNING] Searched paths: {string.Join(", ", possibleEnvPaths.Select(p => Path.GetFullPath(p)))}");
+    }
 }
 
 // Fix TLS issue on Windows
@@ -30,14 +54,24 @@ Console.WriteLine("-------------------------------------------");
 builder.Services.Configure<DatabaseSettings>(
     builder.Configuration.GetSection("SmartAttendanceDatabase"));
 
+// Create a single shared MongoClient for the entire application (avoids dual connection pools)
+var mongoUri = Environment.GetEnvironmentVariable("MONGO_URI") ?? "mongodb://localhost:27017";
+var mongoSettings = MongoClientSettings.FromConnectionString(mongoUri);
+mongoSettings.ServerSelectionTimeout = TimeSpan.FromSeconds(30);
+mongoSettings.ConnectTimeout = TimeSpan.FromSeconds(20);
+mongoSettings.SocketTimeout = TimeSpan.FromSeconds(30);
+mongoSettings.MaxConnectionPoolSize = 50;
+mongoSettings.MinConnectionPoolSize = 5;
+var sharedMongoClient = new MongoClient(mongoSettings);
+builder.Services.AddSingleton<IMongoClient>(sharedMongoClient);
+
 builder.Services.AddSingleton<MongoDbService>();
 
-// Register Prisma-like ORM Context
+// Register Prisma-like ORM Context (uses the shared MongoClient)
 builder.Services.AddSingleton<PrismaDbContext>(sp =>
 {
-    var mongoUri = Environment.GetEnvironmentVariable("MONGO_URI") ?? "mongodb://localhost:27017";
-    var mongoClient = new MongoClient(mongoUri);
-    return new PrismaDbContext(mongoClient, "SmartAttendance");
+    var client = sp.GetRequiredService<IMongoClient>();
+    return new PrismaDbContext(client, "SmartAttendance");
 });
 
 // Register Email Service
@@ -90,6 +124,19 @@ builder.Services.AddCors(options =>
 
 var app = builder.Build();
 
+// Warm up MongoDB connection pool on startup to avoid cold-start delays
+try
+{
+    var warmupClient = app.Services.GetRequiredService<IMongoClient>();
+    var warmupDb = warmupClient.GetDatabase("SmartAttendance");
+    await warmupDb.RunCommandAsync<MongoDB.Bson.BsonDocument>(new MongoDB.Bson.BsonDocument("ping", 1));
+    Console.WriteLine("[STARTUP] MongoDB connection warm-up successful.");
+}
+catch (Exception ex)
+{
+    Console.WriteLine($"[STARTUP WARNING] MongoDB warm-up failed: {ex.Message}. First request may be slow.");
+}
+
 // Enable Swagger if ENABLE_SWAGGER environment variable is set to "true" OR in Development
 var enableSwagger = app.Environment.IsDevelopment() || 
                     Environment.GetEnvironmentVariable("ENABLE_SWAGGER")?.ToLower() == "true";
@@ -135,4 +182,4 @@ app.MapGet("/health", () => Results.Ok(new { status = "ok", timestamp = DateTime
 app.MapGet("/api/health", () => Results.Ok(new { status = "ok", timestamp = DateTime.UtcNow }));
 
 
-app.Run();
+await app.RunAsync();

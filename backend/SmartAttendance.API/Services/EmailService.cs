@@ -28,9 +28,9 @@ namespace SmartAttendance.API.Services
             int[] delaySeconds = { 2, 5, 10 };
             
             var smtpEmail = Environment.GetEnvironmentVariable("SMTP_EMAIL") ?? "smartattendance88@gmail.com";
-            var smtpPassword = Environment.GetEnvironmentVariable("SMTP_PASSWORD") 
-                               ?? Environment.GetEnvironmentVariable("SMTP_APP_PASSWORD") 
-                               ?? "bmvi jgsv njlj udmb";
+            var smtpPassword = Environment.GetEnvironmentVariable("SMTP_APP_PASSWORD") 
+                               ?? Environment.GetEnvironmentVariable("SMTP_PASSWORD") 
+                               ?? "lldl evkd nofq paeb";
             var smtpHost = Environment.GetEnvironmentVariable("SMTP_HOST") ?? "smtp.gmail.com";
             var smtpPortStr = Environment.GetEnvironmentVariable("SMTP_PORT") ?? "587";
 
@@ -65,7 +65,7 @@ namespace SmartAttendance.API.Services
                 try
                 {
                     Console.WriteLine($"[SMTP ATTEMPT {attempt}] Sending to {email}...");
-                    Console.WriteLine("[SMTP CONNECT] Attempting connection...");
+                    Console.WriteLine("SMTP Connected");
                     
                     using var smtpClient = new SmtpClient(smtpHost, smtpPort)
                     {
@@ -74,8 +74,9 @@ namespace SmartAttendance.API.Services
                         Credentials = new System.Net.NetworkCredential(smtpEmail, smtpPassword),
                         Timeout = 60000 // 60 seconds
                     };
+                    Console.WriteLine("SMTP Authenticated");
 
-                    var mailMessage = new MailMessage
+                    using var mailMessage = new MailMessage
                     {
                         From = new MailAddress(smtpEmail, "Smart Attendance System"),
                         Subject = subject,
@@ -86,7 +87,7 @@ namespace SmartAttendance.API.Services
 
                     await smtpClient.SendMailAsync(mailMessage);
                     
-                    Console.WriteLine($"[SMTP SUCCESS] Email sent to {email} on attempt {attempt}");
+                    Console.WriteLine("Mail Sent Successfully");
                     
                     // Update user status
                     await UpdateUserEmailStatusAsync(userToUpdate.Id, "Sent");
@@ -94,6 +95,10 @@ namespace SmartAttendance.API.Services
                 }
                 catch (Exception ex)
                 {
+                    Console.WriteLine("SMTP Failed");
+                    Console.WriteLine($"Exception Message: {ex.Message}");
+                    Console.WriteLine($"Stack Trace: {ex.StackTrace}");
+                    
                     Console.WriteLine("[SMTP FAILED] An exception occurred during SendMailAsync.");
                     string maskedEmail = smtpEmail;
                     if (!string.IsNullOrEmpty(smtpEmail) && smtpEmail.Contains("@"))

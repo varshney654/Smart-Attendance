@@ -1,5 +1,6 @@
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.Extensions.Logging;
 using MongoDB.Driver;
 using SmartAttendance.API.Models;
 using SmartAttendance.API.Services;
@@ -15,12 +16,14 @@ namespace SmartAttendance.API.Controllers
         private readonly MongoDbService _mongoService;
         private readonly PrismaDbContext _db;
         private readonly IEmailService _emailService;
+        private readonly ILogger<UsersController> _logger;
 
-        public UsersController(MongoDbService mongoService, PrismaDbContext db, IEmailService emailService)
+        public UsersController(MongoDbService mongoService, PrismaDbContext db, IEmailService emailService, ILogger<UsersController> logger)
         {
             _mongoService = mongoService;
             _db = db;
             _emailService = emailService;
+            _logger = logger;
         }
 
         [HttpGet]
@@ -68,11 +71,35 @@ namespace SmartAttendance.API.Controllers
         [HttpPost]
         public async Task<IActionResult> CreateUser([FromBody] User userIn)
         {
-            // Hash password logic for manual admin creation if needed, 
-            // but normally register flow handles it. Assuming plain password provided if no hash.
-            userIn.Password = BCrypt.Net.BCrypt.HashPassword(userIn.Password);
+            _logger.LogInformation("[USER CREATED] Starting creation process for user {Email}", userIn.Email);
+            
+            var plainPassword = userIn.Password;
+            if (string.IsNullOrEmpty(plainPassword))
+            {
+                var randomDigits = new Random().Next(1000, 9999);
+                plainPassword = $"User@{randomDigits}";
+            }
+
+            userIn.Password = BCrypt.Net.BCrypt.HashPassword(plainPassword);
+            userIn.TemporaryPassword = plainPassword;
+            userIn.TemporaryPasswordCreatedAt = DateTime.UtcNow;
+            userIn.IsPasswordChanged = false;
+            userIn.EmailDeliveryStatus = "Pending";
+
             await _mongoService.Users.InsertOneAsync(userIn);
-            userIn.Password = "";
+            _logger.LogInformation("[USER CREATED] User {Email} successfully saved to MongoDB. ID: {Id}", userIn.Email, userIn.Id);
+
+            _logger.LogInformation("[STARTING WELCOME EMAIL] Initiating email delivery...");
+            try
+            {
+                await _emailService.SendWelcomeEmailAsync(userIn, plainPassword);
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "[EXCEPTION] Email task failed for user {Email}", userIn.Email);
+            }
+
+            userIn.Password = ""; // Clear password before returning
             return CreatedAtAction(nameof(GetUser), new { id = userIn.Id }, userIn);
         }
 
@@ -103,21 +130,21 @@ namespace SmartAttendance.API.Controllers
             var user = await _mongoService.Users.Find(u => u.Id == id).FirstOrDefaultAsync();
             if (user == null) return NotFound(new { message = "User not found" });
 
-            Console.WriteLine($"[CLEANUP] Starting data cleanup for deleted user: {user.Email} (ID: {id})");
+            _logger.LogInformation("[CLEANUP] Starting data cleanup for deleted user: {Email} (ID: {Id})", user.Email, id);
 
             try
             {
                 // 1 & 2 & 3. Delete user document (which also physically deletes Face Registration Data and Face Descriptors)
                 var result = await _mongoService.Users.DeleteOneAsync(u => u.Id == id);
-                Console.WriteLine($"[CLEANUP] User document deleted. Result: {result.DeletedCount > 0}");
+                _logger.LogInformation("[CLEANUP] User document deleted. Result: {Deleted}", result.DeletedCount > 0);
 
                 // 4. Delete all attendance records
                 var attendanceResult = await _mongoService.Attendances.DeleteManyAsync(a => a.UserId == id);
-                Console.WriteLine($"[CLEANUP] Deleted {attendanceResult.DeletedCount} attendance records.");
+                _logger.LogInformation("[CLEANUP] Deleted {Count} attendance records.", attendanceResult.DeletedCount);
 
                 // 5. Delete all alerts/notifications
                 var alertsResult = await _mongoService.Alerts.DeleteManyAsync(a => a.UserId == id);
-                Console.WriteLine($"[CLEANUP] Deleted {alertsResult.DeletedCount} alerts/notifications.");
+                _logger.LogInformation("[CLEANUP] Deleted {Count} alerts/notifications.", alertsResult.DeletedCount);
 
                 // 6. Delete associated access requests so they can apply again
                 var accessRequests = await _db.AccessRequests.FindManyAsync(r => r.Email == user.Email);
@@ -130,13 +157,14 @@ namespace SmartAttendance.API.Controllers
                         accessReqDeleted++;
                     }
                 }
-                Console.WriteLine($"[CLEANUP] Deleted {accessReqDeleted} access requests for email {user.Email}.");
-                Console.WriteLine($"[CLEANUP] User {user.Email} completely expunged from the system.");
+                _logger.LogInformation("[CLEANUP] Deleted {Count} access requests for email {Email}.", accessReqDeleted, user.Email);
+                _logger.LogInformation("[CLEANUP] User {Email} completely expunged from the system.", user.Email);
                 
                 return NoContent();
             }
             catch (Exception ex)
             {
+                _logger.LogError(ex, "[ERROR] Failed to clean up user data completely for {Email}.", user.Email);
                 return StatusCode(500, new { message = "Failed to clean up user data completely." });
             }
         }
@@ -159,10 +187,14 @@ namespace SmartAttendance.API.Controllers
 
             await _mongoService.Users.ReplaceOneAsync(u => u.Id == id, user);
 
-            _ = Task.Run(async () =>
+            try
             {
                 await _emailService.SendWelcomeEmailAsync(user, password);
-            });
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "[EXCEPTION] Email task failed for user {Email}", user.Email);
+            }
 
             return Ok(new { message = "Credentials generated and email sending started.", password = password });
         }
