@@ -6,7 +6,7 @@ const AdminRequests = () => {
   const [requests, setRequests] = useState([]);
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState('');
-  const [status, setStatus] = useState({ message: '', type: '' });
+  const [status] = useState({ message: '', type: '' });
 
   useEffect(() => {
     fetchRequests();

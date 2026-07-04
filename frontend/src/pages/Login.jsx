@@ -33,7 +33,7 @@ const Login = () => {
         try {
           await api.get('/health', { timeout: 30000 });
           console.log(`[WARM-UP RETRY SUCCESS] Time: ${Date.now() - start}ms`);
-        } catch (retryErr) {
+        } catch {
           console.log(`[WARM-UP RETRY FAILED] Time: ${Date.now() - start}ms`);
         }
       }

@@ -34,7 +34,7 @@ const ScanQR = () => {
           navigate(`/mark-attendance?session=${decodedText}`);
         }
       },
-      (error) => {
+      () => {
         // Handle scan errors silently
       }
     );

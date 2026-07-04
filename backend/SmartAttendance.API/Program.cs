@@ -138,7 +138,7 @@ catch (Exception ex)
 }
 
 // Enable Swagger if ENABLE_SWAGGER environment variable is set to "true" OR in Development
-var enableSwagger = app.Environment.IsDevelopment() || 
+var enableSwagger = app.Environment.IsDevelopment() ||
                     Environment.GetEnvironmentVariable("ENABLE_SWAGGER")?.ToLower() == "true";
 
 if (enableSwagger)

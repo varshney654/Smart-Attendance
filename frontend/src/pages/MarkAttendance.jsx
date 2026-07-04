@@ -94,7 +94,7 @@ const MarkAttendance = () => {
     
     setLoading(true);
     try {
-      const res = await api.post('/attendance/manual', {
+      await api.post('/attendance/manual', {
         userId: selectedUserId,
         status: selectedStatus,
         date: new Date().toISOString(),

@@ -22,11 +22,11 @@ namespace SmartAttendance.API.Controllers
         public async Task<IActionResult> GetDashboardMetrics()
         {
             var today = DateTime.UtcNow.Date;
-            
+
             // Get all non-admin users
             var allUsers = await _mongoService.Users.Find(u => u.Role != "Admin").ToListAsync();
             var totalUsers = allUsers.Count;
-            
+
             // Get today's attendance records
             var startOfDay = today;
             var endOfDay = today.AddDays(1);
@@ -37,12 +37,12 @@ namespace SmartAttendance.API.Controllers
             // Count present/late (not absent)
             var presentToday = todaysAttendance.Count(a => a.Status == "Present" || a.Status == "Late");
             var lateToday = todaysAttendance.Count(a => a.Status == "Late");
-            
+
             // Absent = total users - (present + late) who have attendance records
             // If a user has no attendance record for today, they could be considered absent
             // But for now, let's just show actual recorded attendance
             var absentToday = Math.Max(0, totalUsers - presentToday);
-            
+
             // If no attendance records exist, show 0 for all
             if (todaysAttendance.Count == 0)
             {
@@ -60,7 +60,8 @@ namespace SmartAttendance.API.Controllers
                 .Find(a => a.Date >= today.AddDays(-7) && a.Date <= today)
                 .ToListAsync();
 
-            var trendData = last7Days.Select(date => {
+            var trendData = last7Days.Select(date =>
+            {
                 var dayStart = date.Date;
                 var dayEnd = dayStart.AddDays(1);
                 var dayRecords = trendQuery.Where(a => a.Date >= dayStart && a.Date < dayEnd).ToList();

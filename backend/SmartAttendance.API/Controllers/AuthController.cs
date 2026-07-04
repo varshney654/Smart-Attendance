@@ -54,51 +54,37 @@ namespace SmartAttendance.API.Controllers
         public async Task<IActionResult> Login([FromBody] LoginDto loginDto)
         {
             var stopwatch = System.Diagnostics.Stopwatch.StartNew();
-            Console.WriteLine("[LOGIN REQUEST RECEIVED]");
-            Console.WriteLine($"[LOGIN ATTEMPT] Email: {loginDto.Email}, Role: {loginDto.Role}");
-
-            Console.WriteLine("[DB QUERY START]");
             // Find user using Prisma-like ORM, explicitly excluding FaceData for performance
             var user = await _users.FindByEmailWithoutFaceDataAsync(loginDto.Email);
-            Console.WriteLine($"[DB QUERY COMPLETE] Time: {stopwatch.ElapsedMilliseconds}ms");
 
             if (user == null)
             {
-                Console.WriteLine("[LOGIN FAILED] User not found.");
                 return NotFound(new { message = "User not found", status = 404 });
             }
 
             if (user.IsDisabled)
             {
-                Console.WriteLine("[LOGIN FAILED] User account is disabled.");
                 return Unauthorized(new { message = "Your account has been disabled. Please contact the administrator.", status = 403 });
             }
 
             var passCheckStart = stopwatch.ElapsedMilliseconds;
             if (!BCrypt.Net.BCrypt.Verify(loginDto.Password, user.Password))
             {
-                Console.WriteLine("[LOGIN FAILED] Invalid password.");
                 return Unauthorized(new { message = "Invalid password", status = 401 });
             }
-            Console.WriteLine($"[PASSWORD VERIFIED] Time: {stopwatch.ElapsedMilliseconds - passCheckStart}ms");
 
             if (!string.Equals(user.Role, loginDto.Role, StringComparison.OrdinalIgnoreCase))
             {
-                Console.WriteLine($"[LOGIN FAILED] Role mismatch. Expected: {user.Role}, Provided: {loginDto.Role}");
                 return Unauthorized(new { message = "Role mismatch", status = 401 });
             }
 
             var jwtStart = stopwatch.ElapsedMilliseconds;
             var token = GenerateJwtToken(user);
-            Console.WriteLine($"[JWT GENERATED] Time: {stopwatch.ElapsedMilliseconds - jwtStart}ms");
 
             // Do not send password back
             user.Password = "";
             // PERFORMANCE OPTIMIZATION: FaceData is already excluded by the DB query, but ensure it's an empty list for the frontend
             user.FaceData = new List<double[]>();
-
-            Console.WriteLine($"[RESPONSE SENT] Total Time: {stopwatch.ElapsedMilliseconds}ms");
-            Console.WriteLine($"[LOGIN SUCCESS] User {loginDto.Email} logged in successfully");
 
             return Ok(new
             {
@@ -137,7 +123,7 @@ namespace SmartAttendance.API.Controllers
             var otp = new Random().Next(100000, 999999).ToString();
             user.ResetOtp = BCrypt.Net.BCrypt.HashPassword(otp);
             user.ResetOtpExpiry = DateTime.UtcNow.AddMinutes(10);
-            
+
             if (user.Id != null)
             {
                 await _users.UpdateAsync(user.Id, user);
@@ -187,8 +173,6 @@ namespace SmartAttendance.API.Controllers
         [HttpPost("/api/request-access")]
         public async Task<IActionResult> RequestAccess([FromBody] RequestAccessDto request)
         {
-            Console.WriteLine("[API HIT] /api/request-access");
-            Console.WriteLine("[VALIDATION PASSED]");
             try
             {
                 var existingUser = await _users.FindByEmailAsync(request.Email);
@@ -200,7 +184,6 @@ namespace SmartAttendance.API.Controllers
                 // Generate random password
                 var randomDigits = new Random().Next(1000, 9999);
                 var password = $"User@{randomDigits}";
-                Console.WriteLine($"[PASSWORD GENERATED] Password: {password}");
 
                 // Create User
                 var user = new User
@@ -215,8 +198,6 @@ namespace SmartAttendance.API.Controllers
                     EmailDeliveryStatus = "Pending"
                 };
                 await _users.CreateAsync(user);
-                Console.WriteLine("[USER CREATED]");
-                Console.WriteLine("[DATABASE SAVE COMPLETE]");
 
                 // Re-read user from DB to get the MongoDB-assigned Id
                 var savedUser = await _users.FindByEmailAsync(user.Email);
@@ -232,8 +213,6 @@ namespace SmartAttendance.API.Controllers
                 };
                 await _db.AccessRequests.CreateAsync(accessRequest);
 
-                Console.WriteLine("[CALLING EMAIL SERVICE]");
-                
                 // Fire-and-forget email — don't block the API response
                 var emailUser = user;
                 var emailPassword = password;
@@ -242,21 +221,16 @@ namespace SmartAttendance.API.Controllers
                     try
                     {
                         await _emailService.SendWelcomeEmailAsync(emailUser, emailPassword);
-                        Console.WriteLine("[EMAIL] Welcome email task completed.");
                     }
-                    catch (Exception emailEx)
+                    catch (Exception)
                     {
-                        Console.WriteLine($"[EMAIL ERROR] Failed to send welcome email to {emailUser.Email}: {emailEx.Message}");
                     }
                 });
 
-                Console.WriteLine("[API RESPONSE]");
                 return Ok(new { success = true, message = "Your account has been created successfully. Login credentials will be sent to your email shortly." });
             }
-            catch (Exception ex)
+            catch (Exception)
             {
-                Console.WriteLine($"[ERROR] Exception caught in RequestAccess: {ex.Message}");
-                Console.WriteLine(ex.ToString());
                 return StatusCode(500, new { success = false, message = "Failed to submit request." });
             }
         }
@@ -278,7 +252,7 @@ namespace SmartAttendance.API.Controllers
             // Generate simple random password
             var randomDigits = new Random().Next(1000, 9999);
             var password = $"User@{randomDigits}";
-            
+
             var user = new User
             {
                 Name = request.Name,
@@ -307,11 +281,9 @@ namespace SmartAttendance.API.Controllers
                 try
                 {
                     await _emailService.SendAccessApprovedEmailAsync(emailUser, emailPassword);
-                    Console.WriteLine("[EMAIL] Access approved email task completed.");
                 }
-                catch (Exception emailEx)
+                catch (Exception)
                 {
-                    Console.WriteLine($"[EMAIL ERROR] Failed to send approval email to {emailUser.Email}: {emailEx.Message}");
                 }
             });
 
@@ -323,7 +295,7 @@ namespace SmartAttendance.API.Controllers
         {
             var request = await _db.AccessRequests.FindByIdAsync(id);
             if (request == null) return NotFound(new { message = "Request not found" });
-            
+
             request.Status = "Rejected";
             await _db.AccessRequests.UpdateAsync(id, request);
             return Ok(new { success = true, message = "Request rejected." });

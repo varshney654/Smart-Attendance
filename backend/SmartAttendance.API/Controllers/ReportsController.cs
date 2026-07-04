@@ -41,8 +41,8 @@ namespace SmartAttendance.API.Controllers
             var totalAbsent = records.Count(a => a.Status == "Absent");
 
             // Avoid division by zero
-            var averageAttendanceRate = totalRecords > 0 
-                ? ((double)(totalPresent + totalLate) / totalRecords) * 100 
+            var averageAttendanceRate = totalRecords > 0
+                ? ((double)(totalPresent + totalLate) / totalRecords) * 100
                 : 0;
 
             return Ok(new

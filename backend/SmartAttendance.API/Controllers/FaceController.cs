@@ -43,7 +43,7 @@ namespace SmartAttendance.API.Controllers
                 return BadRequest("Invalid embedding.");
 
             var allUsers = await _mongoService.Users.Find(u => u.FaceData != null && u.FaceData.Any()).ToListAsync();
-            
+
             User? bestMatch = null;
             double bestDistance = double.MaxValue;
             double threshold = 0.55; // Threshold for face-api.js euclidean distance (smaller is better). 0.6 is common, 0.55 is stricter.
@@ -58,7 +58,7 @@ namespace SmartAttendance.API.Controllers
                 {
                     totalDistance += EuclideanDistance(request.Embedding, registeredEmbedding);
                 }
-                
+
                 double averageDistance = totalDistance / user.FaceData.Count;
 
                 if (averageDistance < bestDistance)
@@ -72,13 +72,13 @@ namespace SmartAttendance.API.Controllers
             {
                 // Convert distance to a confidence percentage
                 double confidence = Math.Max(0, Math.Min(1, 1 - (bestDistance / (threshold * 1.5))));
-                
-                return Ok(new 
-                { 
-                    match = true, 
-                    userId = bestMatch.Id, 
-                    userName = bestMatch.Name, 
-                    confidence = Math.Round(confidence * 100, 2) 
+
+                return Ok(new
+                {
+                    match = true,
+                    userId = bestMatch.Id,
+                    userName = bestMatch.Name,
+                    confidence = Math.Round(confidence * 100, 2)
                 });
             }
 

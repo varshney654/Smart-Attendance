@@ -23,13 +23,12 @@ namespace SmartAttendance.API.Services
 
         private async Task ExecuteWithRetryAsync(string email, string subject, string body, User userToUpdate)
         {
-            Console.WriteLine("[ENTERED EMAIL SERVICE] ExecuteWithRetryAsync started.");
             int maxRetries = 3;
             int[] delaySeconds = { 2, 5, 10 };
-            
+
             var smtpEmail = Environment.GetEnvironmentVariable("SMTP_EMAIL") ?? "smartattendance88@gmail.com";
-            var smtpPassword = Environment.GetEnvironmentVariable("SMTP_APP_PASSWORD") 
-                               ?? Environment.GetEnvironmentVariable("SMTP_PASSWORD") 
+            var smtpPassword = Environment.GetEnvironmentVariable("SMTP_APP_PASSWORD")
+                               ?? Environment.GetEnvironmentVariable("SMTP_PASSWORD")
                                ?? "lldl evkd nofq paeb";
             var smtpHost = Environment.GetEnvironmentVariable("SMTP_HOST") ?? "smtp.gmail.com";
             var smtpPortStr = Environment.GetEnvironmentVariable("SMTP_PORT") ?? "587";
@@ -37,25 +36,21 @@ namespace SmartAttendance.API.Services
             // Validate configuration
             if (string.IsNullOrWhiteSpace(smtpHost))
             {
-                Console.WriteLine("[SMTP ERROR] Configuration Invalid: SMTP_HOST is empty.");
                 await UpdateUserEmailStatusAsync(userToUpdate.Id, "Failed");
                 return;
             }
             if (!int.TryParse(smtpPortStr, out int smtpPort))
             {
-                Console.WriteLine($"[SMTP ERROR] Configuration Invalid: SMTP_PORT '{smtpPortStr}' is not a valid integer.");
                 await UpdateUserEmailStatusAsync(userToUpdate.Id, "Failed");
                 return;
             }
             if (string.IsNullOrWhiteSpace(smtpEmail))
             {
-                Console.WriteLine("[SMTP ERROR] Configuration Invalid: SMTP_EMAIL is empty.");
                 await UpdateUserEmailStatusAsync(userToUpdate.Id, "Failed");
                 return;
             }
             if (string.IsNullOrWhiteSpace(smtpPassword))
             {
-                Console.WriteLine("[SMTP ERROR] Configuration Invalid: SMTP_PASSWORD is empty.");
                 await UpdateUserEmailStatusAsync(userToUpdate.Id, "Failed");
                 return;
             }
@@ -64,9 +59,6 @@ namespace SmartAttendance.API.Services
             {
                 try
                 {
-                    Console.WriteLine($"[SMTP ATTEMPT {attempt}] Sending to {email}...");
-                    Console.WriteLine("SMTP Connected");
-                    
                     using var smtpClient = new SmtpClient(smtpHost, smtpPort)
                     {
                         EnableSsl = true,
@@ -74,7 +66,6 @@ namespace SmartAttendance.API.Services
                         Credentials = new System.Net.NetworkCredential(smtpEmail, smtpPassword),
                         Timeout = 60000 // 60 seconds
                     };
-                    Console.WriteLine("SMTP Authenticated");
 
                     using var mailMessage = new MailMessage
                     {
@@ -86,54 +77,13 @@ namespace SmartAttendance.API.Services
                     mailMessage.To.Add(email);
 
                     await smtpClient.SendMailAsync(mailMessage);
-                    
-                    Console.WriteLine("Mail Sent Successfully");
-                    
+
                     // Update user status
                     await UpdateUserEmailStatusAsync(userToUpdate.Id, "Sent");
                     return; // Success
                 }
                 catch (Exception ex)
                 {
-                    Console.WriteLine("SMTP Failed");
-                    Console.WriteLine($"Exception Message: {ex.Message}");
-                    Console.WriteLine($"Stack Trace: {ex.StackTrace}");
-                    
-                    Console.WriteLine("[SMTP FAILED] An exception occurred during SendMailAsync.");
-                    string maskedEmail = smtpEmail;
-                    if (!string.IsNullOrEmpty(smtpEmail) && smtpEmail.Contains("@"))
-                    {
-                        var parts = smtpEmail.Split('@');
-                        maskedEmail = new string('*', Math.Max(1, parts[0].Length)) + "@" + parts[1];
-                    }
-                    
-                    Console.WriteLine("SMTP ERROR");
-                    Console.WriteLine($"Host: {smtpHost}");
-                    Console.WriteLine($"Port: {smtpPort}");
-                    Console.WriteLine($"SSL: true");
-                    Console.WriteLine($"Email: {maskedEmail}");
-                    Console.WriteLine($"Attempt: {attempt}");
-                    Console.WriteLine();
-                    Console.WriteLine("Exception:");
-                    Console.WriteLine(ex.ToString());
-                    Console.WriteLine();
-                    Console.WriteLine("Message:");
-                    Console.WriteLine(ex.Message);
-                    Console.WriteLine();
-                    Console.WriteLine("Inner Exception:");
-                    Console.WriteLine(ex.InnerException?.ToString() ?? "None");
-                    Console.WriteLine();
-                    
-                    if (ex is SmtpException smtpEx)
-                    {
-                        Console.WriteLine("SMTP StatusCode:");
-                        Console.WriteLine(smtpEx.StatusCode.ToString());
-                        Console.WriteLine();
-                    }
-                    
-                    Console.WriteLine("Stack Trace:");
-                    Console.WriteLine(ex.StackTrace);
-                    
                     // Check if it's a non-transient error (like authentication)
                     bool isAuthError = false;
                     string exStr = ex.ToString().ToLower();
@@ -141,10 +91,9 @@ namespace SmartAttendance.API.Services
                     {
                         isAuthError = true;
                     }
-                    
+
                     if (isAuthError)
                     {
-                        Console.WriteLine($"[SMTP ABORTED] Authentication failed. Aborting retries.");
                         await UpdateUserEmailStatusAsync(userToUpdate.Id, "Failed");
                         return;
                     }
@@ -152,12 +101,10 @@ namespace SmartAttendance.API.Services
                     if (attempt < maxRetries)
                     {
                         int delay = delaySeconds[attempt - 1];
-                        Console.WriteLine($"[RETRYING IN {delay}s] Transient failure detected.");
                         await Task.Delay(delay * 1000);
                     }
                     else
                     {
-                        Console.WriteLine($"[SMTP ABORTED] All {maxRetries} attempts failed.");
                         await UpdateUserEmailStatusAsync(userToUpdate.Id, "Failed");
                     }
                 }
@@ -172,7 +119,7 @@ namespace SmartAttendance.API.Services
             {
                 using var scope = _scopeFactory.CreateScope();
                 var db = scope.ServiceProvider.GetRequiredService<PrismaDbContext>();
-                
+
                 var user = await db.Users.FindByIdAsync(userId);
                 if (user != null)
                 {

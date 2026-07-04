@@ -72,7 +72,7 @@ namespace SmartAttendance.API.Controllers
         public async Task<IActionResult> CreateUser([FromBody] User userIn)
         {
             _logger.LogInformation("[USER CREATED] Starting creation process for user {Email}", userIn.Email);
-            
+
             var plainPassword = userIn.Password;
             if (string.IsNullOrEmpty(plainPassword))
             {
@@ -151,7 +151,7 @@ namespace SmartAttendance.API.Controllers
                 int accessReqDeleted = 0;
                 foreach (var req in accessRequests)
                 {
-                    if (req.Id != null) 
+                    if (req.Id != null)
                     {
                         await _db.AccessRequests.DeleteAsync(req.Id);
                         accessReqDeleted++;
@@ -159,7 +159,7 @@ namespace SmartAttendance.API.Controllers
                 }
                 _logger.LogInformation("[CLEANUP] Deleted {Count} access requests for email {Email}.", accessReqDeleted, user.Email);
                 _logger.LogInformation("[CLEANUP] User {Email} completely expunged from the system.", user.Email);
-                
+
                 return NoContent();
             }
             catch (Exception ex)

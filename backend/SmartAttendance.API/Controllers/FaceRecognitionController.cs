@@ -28,14 +28,14 @@ namespace SmartAttendance.API.Controllers
         [Authorize(Roles = "Admin")]
         public async Task<IActionResult> RegisterFace([FromBody] RegisterFaceDto dto)
         {
-            try 
+            try
             {
                 if (dto.FaceData == null || !dto.FaceData.Any())
                     return BadRequest(new { message = "No face data provided." });
 
                 // Cross-verification loop to strictly prevent duplicate Identity registrations
                 var allEnrolledUsers = await _mongoService.Users.Find(u => u.FaceData != null && u.FaceData.Any()).ToListAsync();
-                
+
                 foreach (var user in allEnrolledUsers)
                 {
                     // Allow the user to overwrite their own FaceData safely
@@ -86,14 +86,14 @@ namespace SmartAttendance.API.Controllers
         {
             try
             {
-                var loggedInUserId = User.FindFirst(System.Security.Claims.ClaimTypes.NameIdentifier)?.Value 
-                                  ?? User.FindFirst("id")?.Value 
+                var loggedInUserId = User.FindFirst(System.Security.Claims.ClaimTypes.NameIdentifier)?.Value
+                                  ?? User.FindFirst("id")?.Value
                                   ?? User.FindFirst("sub")?.Value;
-                var loggedInRole = User.FindFirst(System.Security.Claims.ClaimTypes.Role)?.Value 
+                var loggedInRole = User.FindFirst(System.Security.Claims.ClaimTypes.Role)?.Value
                                 ?? User.FindFirst("role")?.Value;
 
                 List<User> usersWithFaces;
-                
+
                 if (loggedInRole == "Admin")
                 {
                     usersWithFaces = await _mongoService.Users

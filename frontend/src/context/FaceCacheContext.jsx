@@ -2,6 +2,7 @@ import React, { createContext, useState, useEffect, useContext } from 'react';
 import api from '../utils/api';
 import { AuthContext } from './AuthContext';
 
+// eslint-disable-next-line react-refresh/only-export-components
 export const FaceCacheContext = createContext();
 
 export const FaceCacheProvider = ({ children }) => {
@@ -11,7 +12,7 @@ export const FaceCacheProvider = ({ children }) => {
   
   const { user } = useContext(AuthContext);
 
-  const fetchFaceData = async () => {
+  const fetchFaceData = React.useCallback(async () => {
     if (!user) return; // Only fetch if logged in
     
     setLoadingCache(true);
@@ -25,11 +26,11 @@ export const FaceCacheProvider = ({ children }) => {
     } finally {
       setLoadingCache(false);
     }
-  };
+  }, [user]);
 
   useEffect(() => {
     fetchFaceData();
-  }, [user]);
+  }, [fetchFaceData]);
 
   return (
     <FaceCacheContext.Provider value={{ faceDataCache, loadingCache, cacheError, refreshFaceCache: fetchFaceData }}>

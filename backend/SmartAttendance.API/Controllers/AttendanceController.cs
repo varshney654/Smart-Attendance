@@ -23,11 +23,11 @@ namespace SmartAttendance.API.Controllers
         [HttpGet]
         public async Task<IActionResult> GetAttendanceRecords([FromQuery] string? search, [FromQuery] string? status, [FromQuery] string? dateRange)
         {
-            var loggedInUserId = User.FindFirst(System.Security.Claims.ClaimTypes.NameIdentifier)?.Value 
-                              ?? User.FindFirst("id")?.Value 
+            var loggedInUserId = User.FindFirst(System.Security.Claims.ClaimTypes.NameIdentifier)?.Value
+                              ?? User.FindFirst("id")?.Value
                               ?? User.FindFirst("sub")?.Value;
-                              
-            var loggedInRole = User.FindFirst(System.Security.Claims.ClaimTypes.Role)?.Value 
+
+            var loggedInRole = User.FindFirst(System.Security.Claims.ClaimTypes.Role)?.Value
                             ?? User.FindFirst("role")?.Value;
 
             var filterBuilder = Builders<Attendance>.Filter;
@@ -39,9 +39,8 @@ namespace SmartAttendance.API.Controllers
                 {
                     return Unauthorized(new { success = false, message = "Security Exception: Authentic JWT Token does not carry a verifiable NameIdentifier." });
                 }
-                
-                Console.WriteLine($"[DEBUG] GetAttendanceRecords - Extracted JWT userId: {loggedInUserId}");
-                
+
+
                 filter &= filterBuilder.Eq(a => a.UserId, loggedInUserId);
             }
 
@@ -60,14 +59,6 @@ namespace SmartAttendance.API.Controllers
 
             var records = await _mongoService.Attendances.Find(filter).SortByDescending(a => a.Date).ThenByDescending(a => a.Time).ToListAsync();
 
-            if (loggedInRole != "Admin")
-            {
-                Console.WriteLine($"[DEBUG] GetAttendanceRecords - Found {records.Count} records for user: {loggedInUserId}");
-                if (records.Count == 0)
-                {
-                    Console.WriteLine($"[WARNING] UserId mismatch or no attendance data found for: {loggedInUserId}");
-                }
-            }
 
             // Enrich with usernames in a structured way (ideally via lookup, but manual here for simplicity)
             var userIds = records.Select(r => r.UserId).Where(id => id != null).Distinct().ToList();
@@ -94,26 +85,20 @@ namespace SmartAttendance.API.Controllers
         [HttpGet("my-summary")]
         public async Task<IActionResult> GetMyAttendanceSummary()
         {
-            var loggedInUserId = User.FindFirst(System.Security.Claims.ClaimTypes.NameIdentifier)?.Value 
-                              ?? User.FindFirst("id")?.Value 
+            var loggedInUserId = User.FindFirst(System.Security.Claims.ClaimTypes.NameIdentifier)?.Value
+                              ?? User.FindFirst("id")?.Value
                               ?? User.FindFirst("sub")?.Value;
-                              
+
             if (string.IsNullOrEmpty(loggedInUserId))
             {
                 return Unauthorized(new { success = false, message = "Security Exception: Authentic JWT Token does not carry a verifiable NameIdentifier." });
             }
 
-            Console.WriteLine($"[DEBUG] GetMyAttendanceSummary - Extracted JWT userId: {loggedInUserId}");
 
             var records = await _mongoService.Attendances
                 .Find(a => a.UserId == loggedInUserId)
                 .ToListAsync();
 
-            Console.WriteLine($"[DEBUG] GetMyAttendanceSummary - Found {records.Count} records in DB for matching UserId.");
-            if (records.Count == 0)
-            {
-                Console.WriteLine($"[WARNING] UserId mismatch or no attendance data found for: {loggedInUserId}");
-            }
 
             var present = records.Count(a => a.Status == "Present");
             var late = records.Count(a => a.Status == "Late");
@@ -127,10 +112,10 @@ namespace SmartAttendance.API.Controllers
         {
             try
             {
-                var loggedInUserId = User.FindFirst(System.Security.Claims.ClaimTypes.NameIdentifier)?.Value 
-                                  ?? User.FindFirst("id")?.Value 
+                var loggedInUserId = User.FindFirst(System.Security.Claims.ClaimTypes.NameIdentifier)?.Value
+                                  ?? User.FindFirst("id")?.Value
                                   ?? User.FindFirst("sub")?.Value;
-                var loggedInRole = User.FindFirst(System.Security.Claims.ClaimTypes.Role)?.Value 
+                var loggedInRole = User.FindFirst(System.Security.Claims.ClaimTypes.Role)?.Value
                                 ?? User.FindFirst("role")?.Value;
 
                 if (loggedInRole != "Admin")
@@ -154,7 +139,7 @@ namespace SmartAttendance.API.Controllers
                         return BadRequest(new { success = false, message = "No facial biometric descriptor was transmitted to the backend." });
 
                     var allUsersWithFaces = await _mongoService.Users.Find(u => u.FaceData != null && u.FaceData.Any()).ToListAsync();
-                    
+
                     string? detectedUserId = null;
                     double globalMinDistance = double.MaxValue;
 
@@ -163,10 +148,10 @@ namespace SmartAttendance.API.Controllers
                         foreach (var embedding in u.FaceData)
                         {
                             double distance = EuclideanDistance(embedding, dto.FaceDescriptor);
-                            if (distance < globalMinDistance) 
+                            if (distance < globalMinDistance)
                             {
                                 globalMinDistance = distance;
-                                if (distance < 0.5) 
+                                if (distance < 0.5)
                                 {
                                     detectedUserId = u.Id;
                                 }
@@ -223,7 +208,7 @@ namespace SmartAttendance.API.Controllers
                     Latitude = dto.Latitude,
                     Longitude = dto.Longitude
                 };
-                
+
                 if (currentTime.TimeOfDay <= thresholdTime)
                 {
                     attendance.Status = "Present";
@@ -232,7 +217,7 @@ namespace SmartAttendance.API.Controllers
                 {
                     attendance.Status = "Late";
                 }
-                
+
                 // Generate Alerts if necessary e.g., Late
                 if (attendance.Status == "Late")
                 {
@@ -249,21 +234,7 @@ namespace SmartAttendance.API.Controllers
             }
         }
 
-        private double CalculateHaversineDistance(double lat1, double lon1, double lat2, double lon2)
-        {
-            var r = 6371e3; // Earth's radius in meters
-            var t1 = lat1 * Math.PI / 180;
-            var t2 = lat2 * Math.PI / 180;
-            var dt = (lat2 - lat1) * Math.PI / 180;
-            var dl = (lon2 - lon1) * Math.PI / 180;
 
-            var a = Math.Sin(dt / 2) * Math.Sin(dt / 2) +
-                    Math.Cos(t1) * Math.Cos(t2) *
-                    Math.Sin(dl / 2) * Math.Sin(dl / 2);
-            var c = 2 * Math.Atan2(Math.Sqrt(a), Math.Sqrt(1 - a));
-
-            return r * c; // Distance in meters
-        }
 
         private double EuclideanDistance(double[] source, List<double> target)
         {
@@ -309,10 +280,10 @@ namespace SmartAttendance.API.Controllers
                 await _mongoService.Attendances.InsertOneAsync(attendance);
 
                 // Audit Logging
-                var adminId = User.FindFirst(System.Security.Claims.ClaimTypes.NameIdentifier)?.Value 
-                           ?? User.FindFirst("id")?.Value 
+                var adminId = User.FindFirst(System.Security.Claims.ClaimTypes.NameIdentifier)?.Value
+                           ?? User.FindFirst("id")?.Value
                            ?? User.FindFirst("sub")?.Value ?? "UnknownAdmin";
-                           
+
                 var adminName = User.FindFirst("name")?.Value ?? "Admin";
                 var targetUser = await _mongoService.Users.Find(u => u.Id == dto.UserId).FirstOrDefaultAsync();
 
